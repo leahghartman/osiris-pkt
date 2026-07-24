@@ -1,0 +1,351 @@
+#!/usr/bin/env python
+
+import re, sys, os, glob
+from optparse import OptionParser
+import subprocess, shutil
+
+templateMakefile = \
+"""
+##################################################################################################
+# Osiris distribution Makefile
+#
+# To compile osiris on your system, please edit the sections below setting your options for:
+#   - Fortran Compiler
+#   - C Compiler
+#   - MPI
+#   - HDF5
+#
+# To change the number of dimensions of the binary (when applicable) change the line
+#
+# integer, parameter :: p_x_dim = 2
+#
+# in os-param.f90 to the required value.
+##################################################################################################
+
+##################################################################################################
+# Fortran Compiler 
+##################################################################################################
+
+# F90 - Fortran95 compiler command
+# F90FLAGS - compilation flags
+
+# This is an example for gfortran, debug and production flags
+
+F90 = gfortran
+
+F90FLAGS_all = -pipe -ffree-line-length-none -fno-range-check
+
+# Debug
+F90FLAGS = $(F90FLAGS_all) -g
+
+# Production
+#F90FLAGS = $(F90FLAGS_all) -O3 -funroll-loops \
+#                      -mssse3 -march=core2 -mfpmath=sse -ffast-math \
+#                      -fomit-frame-pointer -ftree-vectorize 
+
+##################################################################################################
+# C Compiler 
+##################################################################################################
+
+# CC - C compiler command
+# CFLAGS - C compilation flags. Note: the C flags must define one of the following:
+#          FORTRANNOUNDERSCORE, FORTRANDOUBLEUNDERSCORE, or FORTRANSINGLEUNDERSCORE according
+#          to the fortran compiler rule for generating external function names
+
+# This is an example for gcc, with the appropriate flags for gfortran (which appends a single
+# underscore to external function names)
+
+CC  = gcc
+CFLAGS = -O4 -march=core2 -mtune=native -mssse3 -DFORTRANSINGLEUNDERSCORE
+
+
+##################################################################################################
+# MPI 
+##################################################################################################
+
+# MPI_FCOMPILEFLAGS  - Include path for MPI
+# MPI_FLINKFLAGS     - Link path and libraries for MPI
+
+# This is an example for openmpi 1.2.9 installed on directory /opt/openmpi/1.2.9-gfortran-64
+
+MPI_FCOMPILEFLAGS = $(shell /opt/openmpi/1.2.9-gfortran-64/bin/mpif77  --showme:compile)
+MPI_FLINKFLAGS    = $(shell /opt/openmpi/1.2.9-gfortran-64/bin/mpif77  --showme:link)
+
+##################################################################################################
+# HDF5 
+##################################################################################################
+
+# H5_FCOMPILEFLAGS    - Include path for HDF5
+# H5_FLINKFLAGS       - Link path and libraries for HDF5
+
+# This is an example for hdf5 1.8.4 patch 1 installed on directory 
+# opt/hdf5/1.8.4p1-ompi-gfortran-64
+
+H5_FCOMPILEFLAGS = -I/opt/hdf5/1.8.4p1-ompi-gfortran-64/include
+H5_FLINKFLAGS = -L/opt/hdf5/1.8.4p1-ompi-gfortran-64/lib -L/opt/szip/2.1-64/lib \
+                -lhdf5_fortran -lhdf5 -lsz -lz -lm
+
+##################################################################################################
+################################### Do not edit below this line! ################################# 
+##################################################################################################
+
+CF   = $(CFLAGS)
+F90F = $(F90FLAGS) $(MPI_FCOMPILEFLAGS) $(H5_FCOMPILEFLAGS)
+LDF  = $(LDFLAGS) $(H5_FLINKFLAGS) $(MPI_FLINKFLAGS)
+
+
+all : osiris.e
+
+%.o : %.c
+	$(CC) $(CF) $(INCPATH) -c $<
+
+%.o : %.f90
+	$(F90) $(F90F) $(INCPATH) -c $<
+
+# Set the fortran 90 object files
+F90OBJS = __F90OBJS__
+
+# Set the C object files that need also need compiling
+COBJS = os-sys-multi-c.o
+
+osiris.e : $(F90OBJS) $(COBJS)
+	$(F90)  $(F90F) -o $@ $(COBJS) $(F90OBJS) $(LDF)
+	chmod 755 osiris.e
+
+clean :
+	touch a.o && rm -f *.o
+	touch a.mod && rm -f *.mod
+	touch osiris.e && rm -f osiris.e
+
+"""
+
+#------------------------------------------------------------------------------------------------
+# Find all available modules and source files are in a given directory
+#------------------------------------------------------------------------------------------------
+
+def mod_source_files( sourceDir ):
+    sourceFiles = glob.glob( sourceDir+'/*.f90' )
+    modules = dict()
+    for fname in sourceFiles:
+        file = open( fname, 'r' )
+        for line in file :
+            if ( re.match( "\s*module procedure\s*", line.lower()) ):
+                continue
+            else :
+                a = re.match( "\s*module (\S+)\s*", line.lower()) 
+                if ( a ) :
+                    mod = a.group(1)
+                    if ( modules.has_key(mod) ):
+                        print >> sys.stderr, 'There is an ambiguity in module defintion.'
+                        print >> sys.stderr, 'the module %s is defined in the following files:' \
+                                              %mod
+                        print >> sys.stderr, modules[mod], ' and', fname
+                        sys.exit('aborting...')
+                    modules[mod]=fname
+                    break
+        file.close()
+    return modules
+
+#------------------------------------------------------------------------------------------------
+# Find all used modules by a given source file
+#------------------------------------------------------------------------------------------------
+
+def mod_required( fname, cppOptions ):
+    modules = []
+
+    cpp = subprocess.Popen( cppOptions+ [ fname ], \
+                            stdout=subprocess.PIPE )
+    cppout, cpperr = cpp.communicate()
+    if ( cpp.returncode ) :
+        print >> sys.stderr, 'Error preprocessing file.'
+        print >> sys.stderr, cppOptions+ [ file ]
+        sys.exit('aborting...')
+    
+    for line in cppout.split('\n') : 
+        a = re.match( "\s*use (\S+)\s*", line.lower()) 
+        if ( a ) :
+            # The same module may be included inside several subroutines; this
+            # insures it only shows once in the dependency list
+            if ( a.group(1) not in modules ) :
+                modules.append( a.group(1) )
+
+    return modules
+
+#------------------------------------------------------------------------------------------------
+# Recursively build the dependencies for a given file
+#------------------------------------------------------------------------------------------------
+
+def fileDependencies( fname, cppOptions, availableMods, depends ):
+    
+    print 'Building dependencies for ', fname
+
+    # Dependencis for the file
+    fdepends = mod_required( fname, cppOptions )
+    
+    # Get dependencies of dependencies 
+    for dep in fdepends :
+        if ( availableMods.has_key( dep ) ) :
+            # Only build dependency if not done already
+            if ( not availableMods[dep] in depends ) :
+                fileDependencies( availableMods[dep], cppOptions, availableMods, depends )
+                
+    # Add the corresponding file to the list
+    depends.append( fname )
+
+#------------------------------------------------------------------------------------------------
+# Generate an object filename from a source filename
+#------------------------------------------------------------------------------------------------
+
+def object_file( fname ) :
+    base = re.match("(.+)\.(\S+)", fname)
+    return base.group(1)+'.o'
+
+
+#------------------------------------------------------------------------------------------------
+# Main script
+#------------------------------------------------------------------------------------------------
+
+# Parse command line options
+
+parser = OptionParser(usage = "usage: %prog [options] main-source-file.f90 outdir" )
+parser.add_option( "--tracks", dest="useTracks", action="store_true", default = False, \
+                     help = "Include particle tracking" )
+
+parser.add_option( "--pml", dest="usePML", action="store_true", default = False, \
+                     help = "Include PML boundary conditions" )
+
+parser.add_option( "--ionization", dest="useIonization", action="store_true", default = False, \
+                     help = "Include ionization" )
+
+parser.add_option( "--collisions", dest="useCollisions", action="store_true", default = False, \
+                     help = "Include collisions" )
+
+parser.add_option( "--keep-comments", dest="keepComments", action="store_true", default = False, \
+                     help = "Keep source file comments" )
+
+parser.add_option( "--bluegene", dest="forBluegene", action="store_true", default = False, \
+                     help = "Generate a distribution suitable for bluegene systems" )
+
+parser.add_option( "--parallelio", dest="useParallelIO", action="store_true", default = False, \
+                     help = "Use parallel I/O for diagnostics" )
+
+
+(options, args) = parser.parse_args()
+
+if ( len(args) == 0 ):
+    parser.error('No source file supplied')
+
+if ( len(args) == 1 ):
+    parser.error('No output file supplied')
+    
+baseFile = args[0]
+outdir = args[1]
+
+if ( not os.path.isfile(baseFile) ):
+    parser.error('File not found : '+baseFile)
+
+sourceDir = os.path.dirname( baseFile )
+if ( sourceDir == '' ):
+    sourceDir = '.'
+    
+cppOptions = ['gcc','-C','-E','-P','-x','assembler-with-cpp','-I.', '-D__DISTRO__' ]
+
+cppOptions.append('-DP_X_DIM=2')
+
+if ( options.useTracks ) :
+    cppOptions.append('-D__HAS_TRACKS__')
+
+if ( options.usePML ) :
+    cppOptions.append('-D__HAS_PML__')
+
+if ( options.useIonization ) :
+    cppOptions.append('-D__HAS_IONIZATION__')
+
+if ( options.useCollisions ) :
+    cppOptions.append('-D__HAS_COLLISIONS__')
+
+if ( options.forBluegene ) :
+    cppOptions.append('-D__bg__')
+
+# Options that are still not part of the command line options
+extraFiles = ('fortran.h','os-sys-multi-c.c' )
+
+
+# Get available modules
+availableMods = mod_source_files(sourceDir)
+
+# recursively build source file list
+sourceFiles = []
+fileDependencies( baseFile, cppOptions, availableMods, sourceFiles )
+
+# Generate distro
+print "Generating source distribution files..."
+
+outputDir = outdir + '/source'
+
+if ( not os.path.isdir(outdir) ):
+    os.mkdir( outdir )
+if ( not os.path.isdir(outputDir) ):
+    os.mkdir( outputDir )
+
+for file in sourceFiles :
+    print 'Preprocessing %s...'%file
+    cpp = subprocess.Popen( cppOptions+ [ file ], \
+                            stdout=subprocess.PIPE )
+    cppout, cpperr = cpp.communicate()
+    if ( cpp.returncode ) :
+        print >> sys.stderr, 'Error preprocessing file.'
+        print >> sys.stderr, cppOptions+ [ file ]
+        sys.exit('aborting...')
+    
+    try :
+        outputFile = open( outputDir + '/' + os.path.basename( file ), 'w' )
+    except IOError :
+        print >> sys.stderr, 'Unable to open output file ', \
+                             outputDir + '/' + os.path.basename( file )
+        sys.exit('aborting...')
+    
+    if ( options.keepComments ) :
+        # keep comments
+        print >> outputFile, cppout
+    else :    
+        # strip comments
+        quote = '0'
+        for line in cppout.split('\n') : 
+            out = ""
+            for c in line.rstrip() :
+                if ( quote != '0' ) :
+                    if ( c == quote ) :
+                        quote = '0'
+                elif ( c == '"' or c == "'" ) :
+                    quote = c
+                elif ( c == '!' ) :
+                    break
+                out += c
+            out = out.lstrip()
+            if ( out != "" ) :
+                print >> outputFile, out
+    
+    outputFile.close()
+
+# Copying Extra files
+print "Copying extra files..."
+for file in extraFiles :
+    print file, '->', outputDir
+    shutil.copy(sourceDir+'/'+os.path.basename( file ), outputDir)
+
+# Generate Makefile
+print "Creating Makefile..."
+
+f90objs = ""
+for file in sourceFiles :
+    f90objs += ' ' + object_file( os.path.basename(file) )
+
+makeFile = open( outputDir + '/Makefile', 'w' )
+
+print >> makeFile, templateMakefile.replace('__F90OBJS__',f90objs)
+
+makeFile.close()
+
+# Done
+print "Sucess!"

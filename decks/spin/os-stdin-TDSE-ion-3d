@@ -1,0 +1,202 @@
+simulation
+{
+  n0 = 1.741d21, ! 1/kp=0.1272 um
+
+  ! use spin-dependent ionization based on TDSE-imported data
+  algorithm = "neutral-spin",
+}
+
+!--------the node configuration for this simulation--------
+node_conf
+{
+  node_number(1:3) =  2, 1, 1,
+  if_periodic(1:3) =  .false., .false., .false.,
+}
+
+!----------spatial grid----------
+grid
+{
+  nx_p(1:3) =  5250, 150, 150,
+  coordinates = "cartesian",
+}
+
+
+!----------time step and global data dump timestep number----------
+time_step
+{
+  dt     =   0.065,
+  ndump  =   50,
+}
+
+restart
+{
+  ndump_fac = 0,
+  if_restart = .false.,
+  if_remold = .true.,
+}
+
+
+!----------spatial limits of the simulations----------
+!(note that this includes information about
+    ! the motion of the simulation box)
+space
+{
+  xmin(1:3) =   -175.0, -150.0, -150.0,
+  xmax(1:3) =    175.0,  150.0,  150.0,
+  if_move(1:3) = .false., .false., .false.,
+}
+
+
+!----------time limits ----------
+time
+{
+  tmin = 0.0, tmax  = 300.0,
+}
+
+!----------field solver set up-----------------
+el_mag_fld
+{
+  solver = "yee",
+}
+
+!----------boundary conditions for em-fields ----------
+emf_bound
+{
+  type(1:2,1) =   "open", "open",
+  type(1:2,2) =   "open", "open",
+  type(1:2,3) =   "open", "open",
+  ! vpml_bnd_size = 30,
+}
+
+diag_emf
+{
+  ndump_fac_lineout = 1,
+  reports = "e1,slice,x3,75", "e2,slice,x3,75", "e3,slice,x3,75",
+        "b1,slice,x3,75", "b2,slice,x3,75", "b3,slice,x3,75",
+}
+
+
+!----------number of particle species----------
+particles
+{
+  num_neutral = 1,
+  interpolation = "quadratic",
+}
+
+neutral
+{
+  model = "tdse",
+  name = "Xeon",
+
+  ! current only xeon is available
+  neutral_gas = "Xe",
+
+  ! density below this value is truncated
+  den_min = 1.0d-10,
+
+  ! electric field below this value is ignored
+  e_min = 1.0d-6, ! GV/m
+
+  ! set the ionization confinement region
+  if_conf_ion = .true.,
+  ! note that confinement box is defined by grid indices
+  conf_box(1:2,1) = 2000, 3250,
+  conf_box(1:2,2) = 60, 90,
+  conf_box(1:2,3) = 60, 90,
+
+  ! initial spin distribution
+  ! "bidirection": two-points distribution, either forward or backward
+  ! "laser-phase": initialize spin according to laser wavefront
+  sdist_init = "bidirection",
+
+  ! laser parameters for "laser-phase" type
+  ! focus plane in x1, defined same as that in zpulse
+  per_focus = 0.0,
+  ! transverse center of laser, defined same as that in zpulse. note that
+  ! for 3D simulation, it has two components
+  per_center(1:2) = 0.0, 0.0,
+  ! laser frequency
+  omega0 = 3.0,
+  ! focal spot w0
+  per_w0 = 26.2,
+}
+
+profile
+{
+  density = 1.0d-6,
+  profile_type(1:3) = "piecewise-linear","uniform","uniform",
+  num_x = 4,
+  x(1:4,1) = -120.0, -119.0, 119.0, 120.0,
+  fx(1:4,1) = 0.0, 1.0, 1.0, 0.0,
+}
+
+diag_neutral
+{
+  ndump_fac = 1,
+  reports = "ion_charge,slice,x3,75",
+}
+
+!----------information for ELECTRONS----------
+species
+{
+  name = "Xe-electrons",
+  num_par_max = 10000000,
+  rqm = -1.0d0,
+  num_par_x(1:3) = 1, 2, 2,
+  add_tag = .true.,
+}
+
+!----------boundary conditions for this species----------
+spe_bound
+{
+  type(1:2,1) = "open", "open",
+  type(1:2,2) = "open", "open",
+  type(1:2,3) = "open", "open",
+}
+
+diag_species
+{
+  ndump_fac_lineout = 1,
+  ndump_fac_raw = 1,
+
+    raw_fraction = 0.01,
+  reports = "charge,slice,x3,75",
+
+  ndump_fac_tracks = 0,
+  file_tags = "witness-beam.tags",
+  niter_tracks = 10,
+  ifdmp_tracks_efl(1:3) = .true., .true., .true.,
+  ifdmp_tracks_bfl(1:3) = .true., .true., .true.,
+}
+
+zpulse
+{
+  a0 = 0.003,
+  omega0 = 3.0769, ! 260 nm
+  pol_type = 1,
+  pol = 0.0,
+  lon_start = -120.0,
+  lon_rise = 25.8, ! 15fs
+  lon_fall = 25.8,
+  lon_flat = 0.0,
+  per_type = "gaussian",
+  per_focus = 0.0,
+  per_fwhm = 26.2, ! 3.3um
+}
+
+current
+{
+}
+
+! !----------SMOOTHING FOR CURRENTS------------------------------------------------------------
+! smooth
+! {
+!   type(1:2) = "5pass", "none",
+! }
+
+
+diag_current
+{
+}
+
+

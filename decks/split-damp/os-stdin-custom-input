@@ -1,0 +1,409 @@
+!---------------------------------------------
+!Input-deck of 2D, finite-spot simulations
+!author: Kyle Miler
+!date: 5/10/21
+!
+!Physical parameters
+!Transverse box/plasma size = 240 um
+!15.7 cells per micron
+!64 electrons per cell
+!16 ions per cell
+!electrons/ions are 100 eV
+!ions are fully ionized carbon (6q, 12m), with rqm=3672.3054
+!Density profile exponential L=3um between 0.01ncrit and 10ncrit, then constant
+!Laser maximum intensity = 4.57e+19 W/cm2
+!Laser profile = Polynomial
+!Laser length = 0.3 ps FWHM of intensity
+!Laser wavelength = 1 um
+!Laser spot size = 30.0 um
+!n_crit = 1.11698x10^21cm-3
+!diagnostics every 30fs
+!a0 = 5.77
+!c/wp = 0.159155 um
+!1/wp = 0.530516 fs
+!Total time = 3.4 ps
+!---------------------------------------------
+simulation
+{
+  algorithm = "split-damp",
+}
+
+node_conf
+{
+  node_number = 68,64,
+  n_threads = 1,
+  if_periodic = .false.,.false.,
+}
+
+grid
+{
+  nx_p = 5629,3770,
+  load_balance = .true.,.true.,
+  lb_type = "dynamic",
+  n_dynamic = 50,
+  cell_weight = 0.5,
+  ndump_global_load = 400,
+  ndump_node_load = 400,
+}
+
+time_step
+{
+  dt = 0.282,
+  ndump = 1,
+}
+
+restart
+{
+  ndump_fac = 800,
+  if_restart = .false.,
+  if_remold = .true.,
+}
+
+space
+{
+  xmin = -1309.2,-754.0,
+  xmax = 942.4,754.0,
+  if_move = .false.,.false.,
+}
+
+time
+{
+  tmin = 0.0,
+  tmax = 6486.0,
+}
+
+el_mag_fld
+{
+}
+
+emf_bound
+{
+  type(1:2,1) = "open","open",
+  type(1:2,2) = "open","open",
+  vpml_diffuse(1:2,1) = .false.,.true.,
+  vpml_diffuse(1:2,2) = .true.,.true.,
+}
+
+diag_emf
+{
+  ndump_fac = 200,
+  ndump_fac_ene_int = 200,
+  ndump_fac_lineout = 200,
+  n_tavg = 45,
+  reports = "e1,line,x2,20","e2,line,x2,20","e3,line,x2,20","b1,line,x2,20",
+    "b2,line,x2,20","b3,line,x2,20","s1,tavg,line,x2,20","e1,line,x2,3164",
+    "e2,line,x2,3164","e3,line,x2,3164","b1,line,x2,3164","b2,line,x2,3164",
+    "b3,line,x2,3164","s1,tavg,line,x2,3164","e1,line,x2,3323","e2,line,x2,3323",
+    "e3,line,x2,3323","b1,line,x2,3323","b2,line,x2,3323","b3,line,x2,3323",
+    "s1,tavg,line,x2,3323","e1,line,x2,4273","e2,line,x2,4273","e3,line,x2,4273",
+    "b1,line,x2,4273","b2,line,x2,4273","b3,line,x2,4273","s1,tavg,line,x2,4273",
+    "e1,line,x2,5315","e2,line,x2,5315","e3,line,x2,5315","b1,line,x2,5315",
+    "b2,line,x2,5315","b3,line,x2,5315","s1,tavg,line,x2,5315","e1,line,x1,1885",
+    "e2,line,x1,1885","e3,line,x1,1885","b1,line,x1,1885","b2,line,x1,1885",
+    "b3,line,x1,1885","e1,line,x1,2074","e2,line,x1,2074","e3,line,x1,2074",
+    "b1,line,x1,2074","b2,line,x1,2074","b3,line,x1,2074","e1,line,x1,2513",
+    "e2,line,x1,2513","e3,line,x1,2513","b1,line,x1,2513","b2,line,x1,2513",
+    "b3,line,x1,2513",
+}
+
+particles
+{
+  num_species = 2,
+  interpolation = "cubic",
+  ndump_fac_ene = 200,
+}
+
+species
+{
+  name = "electrons",
+  num_par_max = 4000000,
+  rqm = -1.0,
+  num_par_x = 8,8,
+  push_start_time = 1130.589174102029,
+}
+
+udist
+{
+  uth = 0.0139891,0.0139891,0.0139891,
+  ufl = 0.0,0.0,0.0,
+}
+
+profile
+{
+  profile_type = "math func",
+  math_func_expr = "if(x1 >= (-173.611), if(x1 >= 0.0, 10.0, 10.0*exp(0.0530516*x1)), 0.0)",
+  density = 1.0,
+  den_min = 1e-12,
+}
+
+spe_bound
+{
+  type(1:2,1) = "absorbing","thermal",
+  type(1:2,2) = "thermal","thermal",
+  uth_bnd(1:3,1,1) = 0,0,0,
+  uth_bnd(1:3,2,1) = 0.0139891,0.0139891,0.0139891,
+  uth_bnd(1:3,1,2) = 0.0139891,0.0139891,0.0139891,
+  uth_bnd(1:3,2,2) = 0.0139891,0.0139891,0.0139891,
+}
+
+diag_species
+{
+  ndump_fac_pha = 200,
+  ps_nx = 1000,500,
+  ps_xmin = -1000.0,-754.0,
+  ps_xmax = 942.4,754.0,
+  ps_pmin = -10.0,-12.0,-0.11,
+  ps_pmax = 20.0,12.0,0.11,
+  ps_np = 800,300,100,
+  if_ps_p_auto = .true.,.true.,.true.,
+  ps_gammamin = 1.0,
+  ps_gammamax = 100.0,
+  ps_ngamma = 800,
+  if_ps_gamma_auto = .false.,
+  phasespaces = "p1x1","p2x1","p2p1","glx1_q1","x1_j1","x1_q1","x2x1_ene","x1_j2","x2x1_j1","x2x1_j2","x2x1_q1","x2x1_q2","x2x1",
+  n_ene_bins = 1,
+  ene_bins = 0.0,
+  pha_ene_bin = "gx1","x1_j1","x1_q1","glx1","glx1_j1","glx1_q1","gx2","x2_j1","x2x1_j1","x2x1_q1",
+}
+
+damper
+{
+  custom_input = .true.,
+  n_damp = 2,
+  damp_start_time = 2126.0124014961702,
+  damper_direction = 1,
+  local_vth_cutoff = .true.,
+  vth_mult_start = 6.0,
+  vth_mult_full = 6.0,
+  gamma_start = 1.02859,
+  gamma_full = 1.003711,
+  x_start = 816.8124014961701,
+  x_full = 904.723720448851,
+  linear = .true.,
+  fourth_root_temperature = .false.,
+  reemit_with_local_temperature = .true.,
+  reemit_temp_start = 0.08,0.0139891,0.0139891,
+  reemit_temp_full = 0.0139891,0.0139891,0.0139891,
+  stopping_dist_start = 87.91131895268094,
+  stopping_dist_full = 3.139689962595748,
+}
+
+damper
+{
+  custom_input = .true.,
+  n_damp = 2,
+  damp_start_time = 1957.0034942735924,
+  damper_direction = 2,
+  local_vth_cutoff = .true.,
+  vth_mult_start = 6.0,
+  vth_mult_full = 6.0,
+  gamma_start = 1.02859,
+  gamma_full = 1.003711,
+  x_start = 691.206200748085,
+  x_full = 735.1618602244255,
+  linear = .true.,
+  fourth_root_temperature = .false.,
+  reemit_with_local_temperature = .true.,
+  reemit_temp_start = 0.0139891,0.0139891,0.0139891,
+  reemit_temp_full = 0.0139891,0.0139891,0.0139891,
+  use_local_vth_func = .true.,
+  local_vth_func_expr = "if( x1>=0, 1, -1 )",
+  stopping_dist_start = 43.95565947634047,
+  stopping_dist_full = 1.569844981297874,
+}
+
+damper
+{
+  custom_input = .true.,
+  n_damp = 2,
+  damp_start_time = 1957.0034942735924,
+  damper_direction = 2,
+  orientation = "backward",
+  local_vth_cutoff = .true.,
+  vth_mult_start = 6.0,
+  vth_mult_full = 6.0,
+  gamma_start = 1.02859,
+  gamma_full = 1.003711,
+  x_start = -691.206200748085,
+  x_full = -735.1618602244255,
+  linear = .true.,
+  fourth_root_temperature = .false.,
+  reemit_with_local_temperature = .true.,
+  reemit_temp_start = 0.0139891,0.0139891,0.0139891,
+  reemit_temp_full = 0.0139891,0.0139891,0.0139891,
+  use_local_vth_func = .true.,
+  local_vth_func_expr = "if( x1>=0, 1, -1 )",
+  stopping_dist_start = 43.95565947634047,
+  stopping_dist_full = 1.569844981297874,
+}
+
+splitting
+{
+  n_split = 10,
+  unsplit_charge_density = 10.0,
+  unsplit_charge_ppc = 64,
+  splitting_gammas = 1.4,1.5,1.6,1.7,1.8,1.9,
+  if_push = .true.,
+  boost = 0.01,
+  random_boost = .true.,
+  if_recombine = .true.,
+  recombine_start_time = 1957.0034942735924,
+  n_recombine_regions = 3,
+  recomb_box_bounds(1:2,1,1) = 816.8124014961701,-754.0,
+  recomb_box_bounds(1:2,2,1) = 942.4,754.0,
+  recomb_box_bounds(1:2,1,2) = 10.0,691.206200748085,
+  recomb_box_bounds(1:2,2,2) = 816.8124014961701,754.0,
+  recomb_box_bounds(1:2,1,3) = 10.0,-754.0,
+  recomb_box_bounds(1:2,2,3) = 816.8124014961701,-691.206200748085,
+  recomb_cell_dx(1:2,1) = 0.4,0.4,
+  recomb_cell_dx(1:2,2) = 0.4,0.4,
+  recomb_cell_dx(1:2,3) = 0.4,0.4,
+  n_recombine = 5,
+}
+
+species
+{
+  name = "ions",
+  num_par_max = 200000,
+  rqm = 3672.3054,
+  num_par_x = 4,4,
+  push_start_time = 1130.589174102029,
+}
+
+udist
+{
+  uth = 0.000230845,0.000230845,0.000230845,
+  ufl = 0.0,0.0,0.0,
+}
+
+profile
+{
+  profile_type = "math func",
+  math_func_expr = "if(x1 >= (-173.611), if(x1 >= 0.0, 10.0, 10.0*exp(0.0530516*x1)), 0.0)",
+  density = 1.0,
+  den_min = 1e-12,
+}
+
+spe_bound
+{
+  type(1:2,1) = "absorbing","thermal",
+  type(1:2,2) = "thermal","thermal",
+  uth_bnd(1:3,1,1) = 0,0,0,
+  uth_bnd(1:3,2,1) = 0.000230845,0.000230845,0.000230845,
+  uth_bnd(1:3,1,2) = 0.000230845,0.000230845,0.000230845,
+  uth_bnd(1:3,2,2) = 0.000230845,0.000230845,0.000230845,
+}
+
+diag_species
+{
+  ndump_fac_pha = 200,
+  ps_nx = 600,300,
+  ps_xmin = -1000.0,-754.0,
+  ps_xmax = 942.4,754.0,
+  ps_pmin = -0.01,-0.001,-0.001,
+  ps_pmax = 0.01,0.001,0.001,
+  ps_np = 200,200,100,
+  if_ps_p_auto = .true.,.true.,.true.,
+  ps_gammamin = 1.0,
+  ps_gammamax = 1.2,
+  ps_ngamma = 200,
+  if_ps_gamma_auto = .true.,
+  phasespaces = "p1x1","p2x1","p2p1","glx1_q1","x1","x1_j1","x1_q1","x2x1_ene","x1_j2","x2x1_j1","x2x1_j2","x2x1","x2x1_q1","x2x1_q2",
+  n_ene_bins = 1,
+  ene_bins = 0.0,
+  pha_ene_bin = "gx1","x1_j1","x1_q1","glx1","glx1_j1","glx1_q1","gx2","x2_j1","x2x1_j1","x2x1_q1",
+}
+
+damper
+{
+  custom_input = .true.,
+  n_damp = 2,
+  damp_start_time = 2126.0124014961702,
+  damper_direction = 1,
+  local_vth_cutoff = .true.,
+  vth_mult_start = 6.0,
+  vth_mult_full = 6.0,
+  gamma_start = 1.0000010125,
+  gamma_full = 1.0000010125,
+  x_start = 816.8124014961701,
+  x_full = 904.723720448851,
+  linear = .true.,
+  fourth_root_temperature = .false.,
+  reemit_with_local_temperature = .true.,
+  reemit_temp_start = 0.000230845,0.000230845,0.000230845,
+  reemit_temp_full = 0.000230845,0.000230845,0.000230845,
+  stopping_dist_start = 87.91131895268094,
+  stopping_dist_full = 3.139689962595748,
+}
+
+damper
+{
+  custom_input = .true.,
+  n_damp = 2,
+  damp_start_time = 1957.0034942735924,
+  damper_direction = 2,
+  local_vth_cutoff = .true.,
+  vth_mult_start = 6.0,
+  vth_mult_full = 6.0,
+  gamma_start = 1.0000010125,
+  gamma_full = 1.0000010125,
+  x_start = 691.206200748085,
+  x_full = 735.1618602244255,
+  linear = .true.,
+  fourth_root_temperature = .false.,
+  reemit_with_local_temperature = .true.,
+  reemit_temp_start = 0.000230845,0.000230845,0.000230845,
+  reemit_temp_full = 0.000230845,0.000230845,0.000230845,
+  use_local_vth_func = .true.,
+  local_vth_func_expr = "if( x1>=0, 1, -1 )",
+  stopping_dist_start = 43.95565947634047,
+  stopping_dist_full = 1.569844981297874,
+}
+
+damper
+{
+  custom_input = .true.,
+  n_damp = 2,
+  damp_start_time = 1957.0034942735924,
+  damper_direction = 2,
+  orientation = "backward",
+  local_vth_cutoff = .true.,
+  vth_mult_start = 6.0,
+  vth_mult_full = 6.0,
+  gamma_start = 1.0000010125,
+  gamma_full = 1.0000010125,
+  x_start = -691.206200748085,
+  x_full = -735.1618602244255,
+  linear = .true.,
+  fourth_root_temperature = .false.,
+  reemit_with_local_temperature = .true.,
+  reemit_temp_start = 0.000230845,0.000230845,0.000230845,
+  reemit_temp_full = 0.000230845,0.000230845,0.000230845,
+  use_local_vth_func = .true.,
+  local_vth_func_expr = "if( x1>=0, 1, -1 )",
+  stopping_dist_start = 43.95565947634047,
+  stopping_dist_full = 1.569844981297874,
+}
+
+smooth
+{
+  type = "5pass",
+}
+
+antenna_array
+{
+  n_antenna = 1,
+}
+
+antenna
+{
+  a0 = 5.773502691896258,
+  t_rise = 733.226990836344,
+  t_flat = 0.0,
+  t_fall = 733.226990836344,
+  omega0 = 1.0,
+  pol = 0.0,
+  x0 = 0.0,
+  rad_x = 188.4955592153876,
+  focus = 1265.7972935255073,
+}

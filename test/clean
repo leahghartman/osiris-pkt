@@ -1,0 +1,4 @@
+#!/bin/sh -f
+echo "Removing HIST, TIMINGS, RE, MS and LOG directories"
+
+rm -Rf HIST/ MS/ LOG/ RE/ TIMINGS/

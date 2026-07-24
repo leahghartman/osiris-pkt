@@ -1,0 +1,94 @@
+##########################################################################################
+# System specific configuration for PERLMUTTER CPU @ NERSC
+#   System:    Cray
+#   Compilers: GNU family ( gcc, gfortran )
+#   MPI:       Cray MPICH
+
+# See:
+# https://docs.nersc.gov/tutorials/playbooks/compiling/
+
+# Recommended module commands:
+# module load PrgEnv-gnu
+# module load cray-hdf5-parallel
+# module load cray-fftw
+##########################################################################################
+##########################################################################################
+# OSIRIS configuration
+# DISABLE_PGC = 1
+# DISABLE_TILES = 1
+# DISABLE_QED = 1
+# DISABLE_QEDCYL = 1
+# DISABLE_SHEAR = 1
+# DISABLE_RAD = 1
+# DISABLE_XXFEL = 1
+# DISABLE_NEUTRAL_SPIN = 1
+DISABLE_GR = 1
+# DISABLE_CYLMODES = 1
+# DISABLE_OVERDENSE = 1
+# DISABLE_OVERDENSE_CYL = 1
+# ENABLE_CUDA = 1
+# Numeric precision
+#PRECISION = SINGLE
+PRECISION = DOUBLE
+# Fortran preprocessor
+FPP = gcc -C -E -x assembler-with-cpp
+SIMD = AVX2
+SIMD_FLAGS = -march=core-avx2
+F90 = ftn
+F03 = ftn
+cc  = cc
+cxx = CC
+DISABLE_PARANOIA = 1
+##########################################################################################
+# Fortran flags
+# External name mangling
+UNDERSCORE = FORTRANSINGLEUNDERSCORE
+# GNU
+F90FLAGS_all = -pipe -ffree-line-length-none -fno-range-check -cpp \
+               -fallow-argument-mismatch
+# Cray
+# F90FLAGS_all = -pipe -cpp
+# Enable OpenMP code
+FPP += -D_OPENMP
+# GNU
+F90FLAGS_all += -fopenmp
+# NVIDIA
+# F90FLAGS_all += -mp
+# Cray
+# F90FLAGS_all += -homp
+# ------------------------------- Compilation Targets ------------------------------------
+#debug
+F90FLAGS_debug      = $(F90FLAGS_all) -g -Og -fbacktrace -fbounds-check -Wall \
+                      -fimplicit-none -Wimplicit-interface -Wconversion  -Wsurprising \
+                      -Wunderflow -ffpe-trap=invalid,zero,overflow
+# Production
+F90FLAGS_production = $(F90FLAGS_all) -Ofast
+# Profile with VTune
+F90FLAGS_profile    = $(F90FLAGS_all) $(F90FLAGS_production) -g
+##########################################################################################
+# C flags
+#debug
+CFLAGS_debug      = -std=c99 -Og -g -Wall -pedantic -march=native
+# production
+CFLAGS_production = -std=c99 -Ofast -Wno-uninitialized -finline-functions -march=native
+# profile
+CFLAGS_profile    = $(CFLAGS_production) -g
+##########################################################################################
+# Linker flags
+# None required
+LDFLAGS = -lstdc++
+##########################################################################################
+# Libraries
+# MPI
+# MPI is supported through wrapper compilers, no flags required
+# MPI supports MPI_IN_PLACE reduction
+FPP += -D__HAS_MPI_IN_PLACE__
+# HDF5
+# This requires loading the hdf5-parallel module
+H5_ROOT = $(HDF5_ROOT)
+H5_FCOMPILEFLAGS = -I$(H5_ROOT)/include
+H5_FLINKFLAGS    = -L$(H5_ROOT)/lib -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 \
+                   -lz -ldl -lm -Wl,-rpath -Wl,$(H5_ROOT)/lib
+H5_HAVE_PARALLEL = 1
+FFTW_FCOMPILEFLAGS = -I$(FFTW_ROOT)/include
+FFTW_FLINKFLAGS = -L$(FFTW_ROOT)/lib -lfftw3

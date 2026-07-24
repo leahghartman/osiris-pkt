@@ -1,0 +1,343 @@
+
+namelist_details = {
+####################################################################
+#           Defintions for nl_merge_info
+####################################################################
+ '/m_mergedel/read_input_merge_info/nl_merge_info': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('n_check_max_sim_particles',
+""" 
+"""),
+    ('max_sim_particles',
+""" 
+"""),
+    ('nx_merge_cells',
+""" 
+"""),
+    ('np_per_dir',
+""" 
+"""),
+    ('max_weight',
+""" 
+"""),
+ ]
+ },
+####################################################################
+#           Defintions for nl_particles
+####################################################################
+ '/m_particles_qed/read_input_qed/nl_particles': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('num_qed',
+""" 
+"""),
+    ('num_species',
+""" 
+"""),
+    ('low_jay_roundoff',
+""" 
+"""),
+    ('ndump_fac',
+""" 
+"""),
+    ('ndump_fac_ave',
+""" 
+"""),
+    ('ndump_fac_lineout',
+""" 
+"""),
+    ('n_ave',
+""" 
+"""),
+    ('prec',
+""" 
+"""),
+    ('reports',
+""" 
+"""),
+    ('n_tavg',
+""" 
+"""),
+    ('interpolation',
+""" 
+"""),
+    ('grid_center',
+""" 
+"""),
+    ('qed_g_cutoff',
+""" 
+"""),
+    ('p_emit_cutoff',
+""" 
+"""),
+ ]
+ },
+####################################################################
+#           Defintions for nl_qed_collide_info
+####################################################################
+ '/m_particles_qed/read_input_qed_collide_info/nl_qed_collide_info': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('if_qed_collide',
+""" 
+"""),
+    ('nx_coll_cells',
+""" 
+"""),
+    ('if_recoil',
+""" 
+"""),
+ ]
+ },
+####################################################################
+#           Defintions for nl_phot_bound
+####################################################################
+ '/m_photons_class/read_nml_phot_bound/nl_phot_bound': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('type',
+""" 
+"""),
+ ]
+ },
+####################################################################
+#           Defintions for nl_diag_photons
+####################################################################
+ '/m_photons_class/read_nml_phot_diag/nl_diag_photons': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('ndump_fac_pha',
+""" 
+"""),
+    ('ndump_fac_pha_tavg',
+""" 
+"""),
+    ('ndump_fac_lineout',
+""" 
+"""),
+    ('ndump_fac_ene',
+""" 
+"""),
+    ('ndump_fac_temp',
+""" 
+"""),
+    ('ndump_fac_raw',
+""" 
+"""),
+    ('ndump_fac',
+""" 
+"""),
+    ('ndump_fac_ave',
+""" 
+"""),
+    ('n_ave',
+""" 
+"""),
+    ('prec',
+""" 
+"""),
+    ('ps_xmin',
+""" 
+"""),
+    ('ps_xmax',
+""" 
+"""),
+    ('ps_pmin',
+""" 
+"""),
+    ('ps_pmax',
+""" 
+"""),
+    ('if_ps_p_auto',
+""" 
+"""),
+    ('ps_gammamin',
+""" 
+"""),
+    ('ps_gammamax',
+""" 
+"""),
+    ('if_ps_gamma_log',
+""" 
+"""),
+    ('if_ps_gamma_auto',
+""" 
+"""),
+    ('ps_nx',
+""" 
+"""),
+    ('ps_nx_3D',
+""" 
+"""),
+    ('ps_np',
+""" 
+"""),
+    ('ps_np_3D',
+""" 
+"""),
+    ('ps_ngamma',
+""" 
+"""),
+    ('raw_gamma_limit',
+""" 
+"""),
+    ('raw_fraction',
+""" 
+"""),
+    ('raw_math_expr',
+""" 
+"""),
+    ('n_ene_bins',
+""" 
+"""),
+    ('ene_bins',
+""" 
+"""),
+    ('ndump_fac_tracks',
+""" 
+"""),
+    ('n_start_tracks',
+""" 
+"""),
+    ('niter_tracks',
+""" 
+"""),
+    ('file_tags',
+""" 
+"""),
+    ('ifdmp_tracks_efl',
+""" 
+"""),
+    ('ifdmp_tracks_bfl',
+""" 
+"""),
+    ('ifdmp_tracks_psi',
+""" 
+"""),
+    ('phasespaces',
+""" 
+"""),
+    ('pha_ene_bin',
+""" 
+"""),
+    ('pha_cell_avg',
+""" 
+"""),
+    ('pha_time_avg',
+""" 
+"""),
+    ('n_tavg',
+""" 
+"""),
+    ('reports',
+""" 
+"""),
+    ('rep_cell_avg',
+""" 
+"""),
+    ('rep_udist',
+""" 
+"""),
+    ('ndump_fac_pairs',
+""" 
+"""),
+    ('ndump_fac_emission',
+""" 
+"""),
+ ]
+ },
+####################################################################
+#           Defintions for nl_photons
+####################################################################
+ '/m_photons_class/read_input_qed_photons/nl_photons': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('name',
+""" 
+"""),
+    ('num_par_max',
+""" 
+"""),
+    ('add_tag',
+""" 
+"""),
+    ('num_par_x',
+""" 
+"""),
+ ]
+ },
+ 
+}

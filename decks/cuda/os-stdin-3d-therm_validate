@@ -1,0 +1,106 @@
+simulation
+{
+  algorithm = "cuda",
+}
+
+node_conf
+{
+  node_number = 1, 1, 1,
+  n_threads = 1,
+  tile_number = 16, 16, 8, 
+  if_periodic = .true., .true., .true.,
+  tile_topology = "hilbert",
+  ! chunk_pool_size = 500000,
+}
+
+grid
+{
+  nx_p = 128, 128, 64,
+  coordinates = "cartesian",
+}
+
+time_step
+{
+  dt = 0.05,
+  ndump = 10,
+}
+
+restart
+{
+}
+
+space
+{
+  xmin = 0, 0, 0,
+  xmax = 12.8, 12.8, 6.4,
+  if_move = .false., .false.,
+}
+
+time
+{
+  tmin = 0.0,
+  tmax = 5.0,
+}
+
+el_mag_fld
+{
+}
+
+emf_bound
+{
+}
+
+diag_emf
+{
+  ndump_fac = 1,
+  reports = "e1",
+}
+
+particles
+{
+  num_species = 1,
+  interpolation = "linear",
+}
+
+species
+{
+  name = "electrons",
+  num_par_max = 180000,
+  rqm = -1.0,
+  num_par_x = 4, 4, 2, 
+  n_sort = 0,
+  push_type = "standard",
+}
+
+udist
+{
+  uth(1:3) = 0.1, 0.1, 0.1,
+  ! uth(1:3) = 0.0, 0.0, 0.0,
+  ufl(1:3) = 0.0, 0.0, 0.0,
+}
+
+profile
+{
+  density = 1,
+  profile_type = "uniform",
+}
+
+spe_bound
+{
+}
+
+diag_species
+{
+}
+
+current
+{
+}
+
+diag_current
+{
+}
+
+smooth
+{
+}

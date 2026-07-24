@@ -1,0 +1,148 @@
+simulation
+{
+}
+
+node_conf 
+{
+  node_number(1:2) =  1,1,
+  if_periodic(1:2) = .false., .false., 
+}
+
+grid 
+{
+  nx_p(1:2) = 200, 200,
+  coordinates = "cartesian",
+}
+
+time_step 
+{
+  dt     =   0.01,
+  ndump  =   10, 
+}
+
+restart 
+{
+}
+
+space 
+{
+  xmin(1:2) = -5.0 ,  -5.0 ,
+  xmax(1:2) =  5.0 ,   5.0 , 
+  if_move   =  .true., .false.,
+}
+
+time 
+{
+  tmax  = 10.0,
+}
+
+el_mag_fld 
+{
+}
+
+emf_bound 
+{
+  type(1:2,1) =   "open",  "open",
+  type(1:2,2) =   "open",  "open",
+}
+
+diag_emf 
+{
+  ndump_fac     = 10, 
+  ndump_fac_ave = 0,
+  ndump_fac_lineout = 1,
+  reports       = "e2",
+                  
+}
+
+particles
+{
+  num_species = 0,
+}
+
+zpulse_planewaves {
+  ! ------------------------
+  ! standard parameters
+  omega0 = 10, 
+  a0 = 1.0,
+  phase = 0,
+  if_launch = .true.,
+
+  ! ------------------------
+  ! pol_type can be:
+  !     0 - linear polarization with pol degrees
+  !    +1 - clockwise polarization 
+  !    -1 - counter clockwise polarization 
+  !     2 - radial polarization
+  !     3 - azimuthal polarization
+  !  "pol" is the angle of linear pol or the major axis of elipse
+  !  "pol_elipse" controls elipse: minor radius is pol_elipse of major 
+  pol_type = 0,
+  pol = 0,
+  pol_elipse = 1, ! optional, defaults to 1 = circular
+
+  ! ------------------------
+  ! wall injection 
+  !     - wall_injection is a boolean matrix to specify from which walls is the pulse injected: first index is the direction and
+  !             second whether lower (1) or upper (2) wall
+  !     - t_wall_start is the start injection time (lon_position may not be specified (STRONGLY ADVISE TO NOT INCLUDE LON_POSITION) )
+  !     - t_wall_stop is the stop injection time, an optional parameter for predefined pulses
+  !     - initial_injection allows for the injection of a portion of the wave inside the box at simulation start and keep injecting
+  !             from the wall after
+  wall_injection(1,1) = .true.,
+  t_wall_start = 0, ! optional, defaults to zero
+  ! t_wall_stop = 0, ! optional, defaults to however long it takes to inject pulse
+  ! initial_injection = .false., ! optional, defaults to false
+  
+  ! ------------------------
+  ! Tait-Bryan angles 
+  !    1st:  angle of rotation around the x3 axis 
+  !    2nd:  angle of rotation around the rotated x2 axis
+  !    EASY MODE: use "preset". 
+  !       example: preset = "-x2x1" = travelling in -x2 polarized in x1
+  angles(1:2) = 0, 0,    ! optional, defauls to 0, 0 (travels allong x1)
+
+  ! ------------------------
+  ! "focus" is the position of the pulse's focus
+  !    the pulse starts "lon_position" from the focus 
+  !    focuses when t = lon_position
+  focus(1:2) = 5.0, 0.0, 
+  lon_position = -5.0,
+
+  ! ------------------------
+  ! periodicity of repetition of pulse along each direction
+  !    may need to be increased manualy when pulse is bigger than box
+  !periodicity(1:2) = ... ! optional, defauls to box size
+
+  ! ------------------------
+  !  waves whose relative amplitude is bellow "tolerance" are discarded  
+  !    used for speed up ( 1e-4 is ok )
+  tolerance = 1e-4,        ! optional, defauls to 0
+
+  ! ------------------------
+  ! pulse type can be:
+  !    "time"        - standard pulse (mostly monochromatic)
+  !    "space"       - pulse that focus all at the same time
+  !    "vfocus_const"- flying focus. needs extra parameter "vfocus"
+  !    "custom_full" - custom fourier profile
+  !    "custom_lon" - custom long. fourier profile ("per_type" is used)
+  !    "custom_per" - custom transv. fourier profile ("lon_type" is used)
+  !  for "custom_..." profiles:
+  !    "f_k_amp_math_func" - amplitude of each (k1,k2,k3) wave
+  !    "f_k_pha_math_func" - phase of each (k1,k2,k3) wave
+  !    "k1", "k2", "k3" are k_longitudinal and k_perps
+  pulse_type = "time",
+
+  ! ------------------------
+  ! the perpendicular profile of the pulse (exactly the same as zpulse_std)
+  per_type = "gaussian",
+  per_w0 = 1.0,
+
+  ! ------------------------
+  ! the longitudinal profile of the pulse (exactly the same as zpulse_std)
+  lon_type = "sin2", 
+  lon_rise =  3.0, 
+  lon_flat =  2.0,
+  lon_fall =  3.0, 
+
+}

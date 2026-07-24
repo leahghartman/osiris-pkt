@@ -1,0 +1,2202 @@
+# 1 "spec/os-spec-define.f03"
+# 1 "<built-in>" 1
+# 1 "<built-in>" 3
+# 467 "<built-in>" 3
+# 1 "<command line>" 1
+# 1 "<built-in>" 2
+# 1 "spec/os-spec-define.f03" 2
+!-----------------------------------------------------------------------------------------
+
+! Species definition module
+!
+! This file contains the class definition for the following classes:
+!
+! t_spe_bound
+! t_piston
+! t_species
+!-----------------------------------------------------------------------------------------
+
+
+# 1 "./os-preprocess.fpp" 1
+!
+! File: os-preprocess.fpp
+!
+! A set of preprocessing macros for osiris, and the fpp/cpp preprocessor
+!
+!
+
+
+
+! Macros for the IBM CPP/GNU preprocessor
+
+
+
+
+! Assertion macro
+
+
+
+! Debug functions
+# 33 "./os-preprocess.fpp"
+! SCR hostname functions
+
+
+
+
+
+
+
+! LOG functions
+
+
+
+
+! ERROR functions
+
+
+
+
+
+
+! WARNING functions
+
+
+
+
+! functions for restart io
+# 14 "spec/os-spec-define.f03" 2
+# 1 "./os-config.h" 1
+! Configuration file for osiris
+
+! ----------------------------------------------------------------------------------------
+! Algorithm options
+! ----------------------------------------------------------------------------------------
+
+! ----------------------------------------------------------------------------------------
+! System options
+! ----------------------------------------------------------------------------------------
+
+! MPI supports MPI_IN_PLACE in global operations
+!#define 1
+
+! Use OpenMP
+!#define 1
+
+! Use SIMD optimized code
+!#define SIMD
+!#define SIMD_SSE
+!#define SIMD_AVX
+!#define SIMD_BGQ
+!#define SIMD_MIC
+
+! Use SION for checkpointing (not available on all systems)
+!#define __RST_IO__ = __RST_SION__
+
+! Use log files
+!#define __USE_LOG__
+
+! Use MPE for logging and profiling
+!#define __USE_MPE__
+
+! Compiler does not fully support the sizeof intrinsic which is a Fortran 2003 feature
+!#define __NO_SIZEOF__
+
+! Use the PAPI library for profiling
+!#define __USE_PAPI__
+
+
+! ----------------------------------------------------------------------------------------
+! Distribution Options
+! ----------------------------------------------------------------------------------------
+!
+! Optional modules to be removed for distribution
+! These are all turned on by default unless the __DISTRO__ preprocessor macro is defined
+!
+! ----------------------------------------------------------------------------------------
+
+
+
+! Include Ionization module
+
+
+! Include binary collisions module
+
+
+! Include particle tracking module
+
+
+! Include perfectly matched layers boundary conditions for EMF
+
+
+! Include spin advance module which is disabled by default
+! #define __HAS_SPIN__
+
+! Include a debug flag for cylindrical modes simulations
+! #define __CYL_MODES_DEBUG__
+
+! Compile functions for reporting B fields in the RaDiO module
+! #define __HAS_RAD_BFLD__
+# 15 "spec/os-spec-define.f03" 2
+
+module m_species_define
+
+# 1 "./memory/memory.h" 1
+! Include file for the memory module
+! Files must include this file using #include "memory/memory.h" rather than just using the module
+! the #include must be placed where the module use statement would usually be i.e.
+!
+! module module2
+!
+! use module1
+! #include "memory/memory.h"
+!
+# 19 "./memory/memory.h"
+use memory
+# 19 "spec/os-spec-define.f03" 2
+
+use m_system
+use m_parameters
+
+use m_fparser
+
+
+use m_time_avg
+
+use m_diagnostic_utilities
+use m_diagfile, only : p_no_offset
+
+use m_boosted_diag, only : t_boosted_diag
+
+use m_time_step, only : t_time_step
+use m_space, only : t_space
+use m_grid_define, only : t_grid, t_msg_patt
+use m_node_conf, only : t_node_conf
+use m_restart, only : t_restart_handle
+use m_input_file, only : t_input_file
+use m_emf_define, only : t_emf
+use m_vdf_define, only : t_vdf, t_vdf_report
+use m_vdf_comm, only : t_vdf_msg
+use m_current_define,only : t_current
+use m_zpulse, only : t_zpulse_list
+
+!-----------------------------------------------------------------------------------------
+
+implicit none
+
+private
+
+! string to id restart data
+character(len=*), parameter :: p_spec_rst_id = "species rst data - 0x000F"
+public :: p_spec_rst_id
+
+! minimal block size to be used when growing particle buffers
+integer, parameter :: p_spec_buf_block = 131072 ! 128k
+
+! species position definition
+integer, parameter :: p_cell_low = 1
+integer, parameter :: p_cell_near = 2
+
+!-----------------------------------------------------------------------------------------
+! Momentum distribution definitions
+!-----------------------------------------------------------------------------------------
+
+! constants for velocity distribution
+integer, parameter :: p_none = -1 ! all particles initialized at rest
+integer, parameter :: p_thermal = 1 ! normal distribution of momentum
+integer, parameter :: p_random_dir = 2 ! fixed velocity, random direction
+integer, parameter :: p_waterbag = 3 ! waterbag
+integer, parameter :: p_relmax = 4 ! Relativistic maxwellian
+integer, parameter :: p_waterbag_rel = 5 ! Relativistic waterbag
+integer, parameter :: p_relmax_boosted = 6 ! Relativistic juettner with a boost
+integer, parameter :: p_uth_expr = 7 ! Math function input for the momentum
+integer, parameter :: p_vel_python = 8 ! Python function input for the momentum
+
+integer, parameter :: p_half_max = 10 ! this is only used for thermal boundaries
+
+
+integer, parameter :: p_uniform = 0 ! uniform distribution
+integer, parameter :: p_spatial = 1 ! spatially dependent distribution
+integer, parameter :: p_zpulse_equilibrium = 2 ! spatially dependent distribution
+# 94 "spec/os-spec-define.f03"
+! force recalculation of energy after particle push
+integer, parameter :: p_ene_recalc = -1
+
+! constant for default relmax distribution cut-off (parameter x vdist_T)
+real, parameter :: p_relmax_umax = 20.0
+
+! constants for momentum and charge increase for beam loading
+integer, parameter :: incr_linear = 1 ! increase linear within n steps, default
+integer, parameter :: incr_regressive = 2 ! increase regressive (first strong, than weaker)
+!integer, parameter :: incr_progressive = 3 ! increase progressive (first weak, than stronger)
+integer, parameter :: incr_unfreeze = 3 ! Drift in x1 and then progressively unfreeze
+
+! Maximum buffer size for step 1 communication (in bytes)
+# 123 "spec/os-spec-define.f03"
+integer, parameter :: p_max_buffer1_size = 4194304
+!integer, parameter :: p_max_buffer1_size = 1048576
+!integer, parameter :: p_max_buffer1_size = 128
+
+
+
+public :: p_none, p_ene_recalc
+public :: p_thermal, p_random_dir, p_waterbag, p_relmax, p_zpulse_equilibrium
+public :: p_relmax_boosted, p_waterbag_rel, p_uth_expr, p_vel_python
+public :: p_half_max, p_relmax_umax
+public :: p_uniform, p_spatial
+public :: incr_linear, incr_regressive, incr_unfreeze !,incr_progressive
+public :: p_max_buffer1_size
+
+type t_udist
+
+  integer :: uth_type ! distribution type
+  real(p_k_part), dimension(p_p_dim) :: uth ! thermo-momentum
+
+  ! Parameters for relativistic maxwellian temperature
+  real(p_k_part) :: relmax_T ! relmax temperature
+  real(p_k_part) :: relmax_umax ! relmax max temperature
+
+  real(p_k_part) :: relmax_beta_boost ! \beta * \gamma of boost
+  integer :: relmax_boost_dir ! direction of boost
+
+  logical :: use_spatial_relmax_boost
+  type(t_fparser) :: spatial_relmax_T
+  type(t_fparser) :: spatial_beta_boost
+
+  logical :: use_spatial_uth
+  type(t_fparser), dimension(p_p_dim) :: spatial_uth
+
+  integer :: ufl_type
+  logical :: use_spatial_ufl
+  real(p_k_part), dimension(p_p_dim) :: ufl ! fluid-momentum
+  type(t_fparser), dimension(p_p_dim) :: spatial_ufl
+
+  type(t_fparser), dimension(p_p_dim) :: math_func_uth
+
+  logical :: use_classical_uadd
+  logical :: use_particle_uacc
+  logical :: use_zpulse_equilibrium
+
+  ! zpulse_mov_wall list
+  class( t_zpulse_list ), pointer :: zplist => null()
+  real(p_double) :: time = 0.0 ! time
+  real(p_double) :: tmin = 0.0
+
+  ! Python variables
+  character(len = p_max_expr_len) :: uth_py_mod = "", uth_py_func = ""
+  character(len = p_max_expr_len) :: ufl_py_mod = "", ufl_py_func = ""
+  logical :: use_py_spatial_uth = .false.
+
+  ! Gradual acceleration
+  integer :: n_accelerate = -1
+  integer :: n_accelerate_type
+
+  ! initialize with a free streaming pusher with increasing charge
+  ! within the first n steps
+  integer :: n_q_incr = -1
+  integer :: n_q_incr_type
+
+  ! Unfreeze parameters
+  real(p_double) :: unfreeze_vel, unfreeze_z0
+
+  real(p_k_part), dimension(p_p_dim) :: umin
+  real(p_k_part), dimension(p_p_dim) :: umax
+  logical, dimension(p_p_dim) :: math_func_use_thermal
+
+end type t_udist
+# 217 "spec/os-spec-define.f03"
+!-----------------------------------------------------------------------------------------
+! Species diagnostic classes definitions
+!-----------------------------------------------------------------------------------------
+
+# 1 "spec/diagnostics/os-spec-diag-def.f03" 1
+
+! This file is meant to be included through an #include statement
+
+!-----------------------------------------------------------------------------------------
+! Species diagnostic classes definitions
+!-----------------------------------------------------------------------------------------
+
+!-----------------------------------------------------------------------------------------
+! Particle tracks diagnostics and particle track class
+!-----------------------------------------------------------------------------------------
+
+type t_track
+
+  integer :: npoints = 0 ! number of points in memory
+  integer :: savedpoints = 0 ! number of points saved to disk
+  integer, dimension(2) :: tag = 0 ! tag of particle being tracked
+  integer :: part_idx = -1 ! index of particle being tracked (-1) means
+                                        ! that particle is not on local node
+
+  real(p_k_part), dimension(:,:), pointer :: data => null() ! track points data
+  integer, dimension(:), pointer :: n => null() ! track points iterations
+
+end type t_track
+
+
+type t_track_set
+
+  ! maximum number of points to hold
+  integer :: maxpoints = -1
+
+  ! number of iterations between track points
+  integer :: niter = 1
+
+  ! file holding tags of particles to follow
+  character(len = p_max_filename_len) :: file_tags = ''
+
+  ! filename to write tracks to
+  character(len = p_max_filename_len) :: file_path = ''
+  character(len = p_max_filename_len) :: file_name = ''
+
+  ! total number of tracks
+  integer :: ntracks = 0
+  ! actual tracks
+  type( t_track ), dimension(:), pointer :: tracks => NULL()
+
+  ! Additional field data
+  integer :: nfields = 0
+
+  ! switches to decide which field components to write in tracks
+  logical, dimension(p_f_dim) :: ifdmp_tracks_efl
+  logical, dimension(p_f_dim) :: ifdmp_tracks_bfl
+
+  ! Include write psi diagnostic at particle positions
+  logical :: ifdmp_tracks_psi
+
+  ! buffers used when storing extra field data in tracks
+  real(p_k_part), dimension(:,:), pointer :: field_buffer => null()
+  real(p_k_part), dimension(:,:), pointer :: pos_buffer => null()
+  integer, dimension(:,:), pointer :: ipos_buffer => null()
+
+  ! set the initial buffer size to 0, this will force the buffers to be allocated
+  ! as soon as the number of particles present on this node is > 0
+  integer :: size_buffer = 0
+
+  ! list of tags present / missing
+  ! each item is the index of the track on the tracks array
+  integer, dimension(:), pointer :: present => null()
+  integer, dimension(:), pointer :: missing => null()
+
+  ! list sizes (for simplicity)
+  integer :: npresent = 0, nmissing = 0
+
+end type t_track_set
+
+
+!-----------------------------------------------------------------------------------------
+! Phasespace diagnostics and phasespace list Class
+!-----------------------------------------------------------------------------------------
+
+integer, parameter, public :: p_max_phasespace_dims = 3
+integer, parameter, public :: p_max_n_ene_bins = 32
+
+! Maximum lenght of phasespace name
+integer, parameter, public :: p_max_phasespace_namelen = 32
+
+
+type t_phasespace
+  integer :: ndims = -1
+  character(len=p_max_phasespace_namelen) :: name = "-"
+
+  ! quantity to use as the axis for the phasespace
+  ! 1 -> position, 2 -> momenta, 3 -> gamma 4 -> log10(gamma)
+  integer, dimension( p_max_phasespace_dims ) :: x_or_p = 0
+
+  ! coordinate to use as the axis for the phasespace
+  ! has no meaning if x_or_p = 3, 4
+  integer, dimension( p_max_phasespace_dims ) :: xp_dim = 0
+  type( t_time_avg ) :: tavg
+  integer :: ps_type = -1
+
+  type( t_phasespace ), pointer :: next => null()
+end type t_phasespace
+
+type t_phasespace_list
+  type( t_phasespace ), pointer :: head => null()
+  type( t_phasespace ), pointer :: tail => null()
+
+  contains
+
+  procedure :: add_to_list => add_phasespace_to_list
+end type
+
+type t_phasespace_diagnostics
+
+  integer :: ndump_fac
+
+  integer :: ndump_fac_tavg
+
+  ! number of time steps to average over for time averaged
+  integer :: n_tavg
+
+  ! physical range for phasespace data dumps
+  real(p_diag_prec), dimension(p_x_dim) :: xmin, xmax
+  real(p_diag_prec), dimension(p_p_dim) :: pmin, pmax
+  real(p_diag_prec), dimension(p_p_dim) :: lmin, lmax
+
+  ! switch for autorange of p for phasespaces
+  logical, dimension(p_p_dim) :: if_p_auto
+
+  ! switch for autorange of l for phasespaces
+  logical, dimension(p_p_dim) :: if_l_auto
+
+  ! physical range for 1D phasespace data dumps
+  real(p_diag_prec) :: gammamin, gammamax
+  real(p_diag_prec) :: kemin, kemax
+
+  ! switch for autorange of 1D phasespace data dumps
+  logical :: if_gamma_auto, if_ke_auto
+
+  ! resolutions for phasespace data dumps
+  integer, dimension(p_x_dim) :: nx, nx_3D
+  integer, dimension(p_p_dim) :: np, np_3D
+  integer, dimension(p_p_dim) :: nl, nl_3D
+
+  ! resolution for 1D phasespace data dumps
+  integer :: ngamma, nke
+
+  ! energy binned diagnostics parameters
+  integer :: n_ene_bins
+  real(p_diag_prec), dimension(p_max_n_ene_bins) :: ene_bins
+
+  ! normal phasespaces
+  class( t_phasespace_list ), pointer :: phasespace_list => null()
+
+  ! energy binned phasespaces
+  class( t_phasespace_list ), pointer :: pha_ene_bin_list => null()
+
+  ! cell average phasespaces
+  class( t_phasespace_list ), pointer :: pha_cell_avg_list => null()
+
+  ! time averaged phasespaces
+  class( t_phasespace_list ), pointer :: pha_time_avg_list => null()
+
+  contains
+
+  procedure :: allocate_objs => allocate_objs_phasespace_diag
+  procedure :: init_list => init_phasespace_list
+  procedure :: get_params => get_phasespace_parameters
+  procedure :: size => size_phasespace
+
+end type
+
+type t_phasespace_params
+  integer :: ndims
+
+  integer, dimension(3) :: n
+  real(p_k_part), dimension(3) :: min, max
+  logical, dimension(3) :: move_c
+
+  character( len = 80 ) :: name, long_name, unit
+  character( len = 80 ), dimension(3) :: xname, xlabel, xunits
+  real(p_double), dimension(3) :: offset_x = p_no_offset
+  real(p_double) :: offset_t = p_no_offset
+  ! This offset is for phasespace axes
+  real(p_double), dimension(3) :: offset_t_ax = p_no_offset
+end type t_phasespace_params
+
+!-----------------------------------------------------------------------------------------
+! Species Diagnostics Class
+!-----------------------------------------------------------------------------------------
+integer, parameter :: p_max_diag_len = 18
+
+type :: t_diag_species
+
+
+  ! Normal diagnostics
+  character( len = p_max_diag_len ), dimension(:), pointer :: report_quants => null()
+  character( len = p_max_diag_len ), dimension(:), pointer :: boosted_report_quants => null()
+
+  ! density reports
+  type(t_vdf_report), pointer :: reports => null()
+
+  ! cell average reports
+  type(t_vdf_report), pointer :: rep_cell_avg => null()
+
+  ! udist reports
+  type(t_vdf_report), pointer :: rep_udist => null()
+
+  ! boost stuff
+  class(t_boosted_diag), pointer :: boosted_diag => null()
+  logical :: if_use_boosted_diag, if_use_boosted_raw
+
+  ! frequency of species dianostic data dumps
+  integer :: ndump_fac_ene ! energy
+  integer :: ndump_fac_heatflux ! Heat flux
+  integer :: ndump_fac_temp ! Temperature
+  integer :: ndump_fac_raw ! Particle data dumps
+
+  ! parameters for raw data dump
+  real(p_diag_prec) :: raw_gamma_limit
+  real(p_diag_prec) :: raw_fraction
+  ! if raw_if_pos_ref_box is true in one direction, the raw diagnostic position of this
+  ! direction will refer the the simulation box edge instead of global coordinates
+  logical, dimension(p_x_dim) :: raw_if_pos_ref_box
+  ! parameters for function parser
+  character(len = p_max_expr_len) :: raw_math_expr = " "
+  type(t_fparser) :: raw_func
+
+  ! particle tracking data
+  integer :: ndump_fac_tracks ! frequency of track diagnostic writes
+  integer :: n_start_tracks = -1 ! iteration to start writing tracks
+  type( t_track_set ) :: tracks
+
+  ! phasespaces
+  class( t_phasespace_diagnostics ), pointer :: phasespaces => null()
+
+  contains
+
+  procedure :: allocate_objs => allocate_objs_diag_species
+  procedure :: avail_report_quants => avail_report_quants_species
+  procedure :: init_report_quants => init_report_quants_species
+  procedure :: init => init_diag_species
+  procedure :: read_input => read_input_diag_species
+  procedure :: raw_ref_box => raw_ref_box_species
+
+end type t_diag_species
+
+interface
+subroutine allocate_objs_diag_species( this )
+  import t_diag_species
+  class( t_diag_species ), intent( inout ) :: this
+end subroutine
+end interface
+
+interface
+subroutine init_diag_species( this, spec_name, n_x_dim, ndump_fac, interpolation, &
+                              restart, restart_handle )
+  import t_diag_species, t_restart_handle
+  class ( t_diag_species ), intent( inout ) :: this
+  character( len=* ), intent(in) :: spec_name
+  integer, intent(in) :: n_x_dim
+  integer, intent(in) :: ndump_fac
+  integer, intent(in) :: interpolation
+  logical, intent(in) :: restart
+  type( t_restart_handle ), intent(in) :: restart_handle
+end subroutine
+end interface
+
+interface
+subroutine read_input_diag_species( this, input_file, gamma )
+  import t_diag_species, t_input_file, p_double
+  class ( t_diag_species ), intent(inout) :: this
+  class( t_input_file ), intent(inout) :: input_file
+  real(p_double), intent(in) :: gamma
+end subroutine
+end interface
+
+interface
+function avail_report_quants_species( this )
+  import t_diag_species
+  class( t_diag_species ), intent(in) :: this
+  integer :: avail_report_quants_species
+end function
+end interface
+
+interface
+subroutine init_report_quants_species( this )
+  import t_diag_species
+  class( t_diag_species ), intent(inout) :: this
+end subroutine
+end interface
+
+interface
+pure function raw_ref_box_species( this, dim )
+  import t_diag_species
+  class( t_diag_species ), intent(in) :: this
+  integer, intent(in) :: dim
+  logical :: raw_ref_box_species
+end function
+end interface
+
+!------- phasespace routines --------
+interface
+  subroutine add_phasespace_to_list( list, ndims, x_or_p, xp_dim, ps_type )
+    import t_phasespace_list
+    class( t_phasespace_list ), intent( inout ) :: list
+    integer, intent(in) :: ndims
+    integer, dimension(:), intent(in) :: x_or_p, xp_dim
+    integer, intent(in) :: ps_type
+  end subroutine
+end interface
+
+interface
+  subroutine allocate_objs_phasespace_diag( this )
+    import t_phasespace_diagnostics
+    class( t_phasespace_diagnostics ), intent(inout) :: this
+  end subroutine
+end interface
+
+interface
+  subroutine init_phasespace_list( this, list, phasespaces, msg, time_average )
+    import t_phasespace_diagnostics, t_phasespace_list
+    class( t_phasespace_diagnostics ), intent(in) :: this
+    class( t_phasespace_list ), intent(inout) :: list
+    character(len=*), dimension(:), intent(in) :: phasespaces
+    character(len=*), intent(in) :: msg
+    logical, intent(in), optional :: time_average
+  end subroutine
+end interface
+
+interface
+  subroutine get_phasespace_parameters( this, phasespace, g_space, params )
+    import t_phasespace_diagnostics, t_phasespace, t_space, t_phasespace_params
+    class( t_phasespace_diagnostics ), intent(in) :: this
+    type( t_phasespace ), intent(in) :: phasespace
+    type( t_space ), intent(in) :: g_space
+    type (t_phasespace_params), intent(out) :: params
+  end subroutine
+end interface
+
+interface
+  function size_phasespace( this, phasespace )
+    import t_phasespace_diagnostics, t_phasespace
+    class( t_phasespace_diagnostics ), intent(in) :: this
+    type( t_phasespace ), intent(in) :: phasespace
+    integer :: size_phasespace
+  end function
+end interface
+# 222 "spec/os-spec-define.f03" 2
+
+!-----------------------------------------------------------------------------------------
+! Species Boundary Condition Class
+!-----------------------------------------------------------------------------------------
+
+type :: t_spe_bound
+
+  ! Boundary condition type
+  integer, dimension(2,p_max_dim) :: type
+
+  ! Type of momenta distribution for each wall
+  integer, dimension(2,p_max_dim) :: thermal_type
+
+  ! thermal and fluid momenta of the thermal bath BC
+  real(p_k_part), dimension( p_p_dim,2,p_x_dim ) :: uth_bnd
+  real(p_k_part), dimension( p_p_dim,2,p_x_dim ) :: ufl_bnd
+
+contains
+
+  procedure, nopass :: init_tmp_buf_current => init_tmp_buf_current_spe_bnd
+  procedure, nopass :: cleanup_tmp_buf_current => cleanup_tmp_buf_current_spe_bnd
+
+end type t_spe_bound
+!-----------------------------------------------------------------------------------------
+
+!-----------------------------------------------------------------------------------------
+! species message object
+!-----------------------------------------------------------------------------------------
+
+type t_spec_msg
+
+  ! communicator
+  integer :: comm = MPI_COMM_NULL
+
+  ! message request id
+  integer :: request = MPI_REQUEST_NULL
+
+  ! node communicating to/from
+  integer :: node = -1
+
+  ! message tag ( optional )
+  integer :: tag = 0
+
+  ! number of particles to send/receive
+  integer :: n_part = 0
+
+  ! size of packed data for single particle
+  integer :: particle_size
+
+  ! buffer sizes for communication
+  integer :: max_buffer1_size = p_max_buffer1_size
+  integer :: n_part1 = 0, n_part2 = 0
+  integer :: size1 = 0, size2 = 0
+
+  ! buffers for messages
+  integer(p_byte), dimension(:), pointer :: buffer1 => null()
+  integer(p_byte), dimension(:), pointer :: buffer2 => null()
+
+  ! attributes for tile module
+  ! step, dim, and num_par in tiled boundary update
+  integer :: step, dim
+
+  ! number of tils grouped into first message buffer
+  integer :: n_tils1 = 0
+
+  ! add potential to have a linked list of these
+  type(t_spec_msg), pointer :: next => null()
+
+end type t_spec_msg
+!-----------------------------------------------------------------------------------------
+
+!-----------------------------------------------------------------------------------------
+! Piston Class
+!-----------------------------------------------------------------------------------------
+
+type :: t_piston
+  ! parameters from inputdeck (processed)
+  integer :: dim ! dimension in which piston moves
+  integer :: updown ! edge from whitch piston starts
+  real(p_k_part) :: u ! proper velocity ( gamma v) of piston
+  real(p_k_part) :: start_pos ! position from which piston starts
+  real(p_k_part) :: start_time ! time when piston launched of edge
+  real(p_k_part) :: stop_time ! time when piston disapears
+  real(p_k_part) :: opacity_factor ! uniform opacity or factor for profile
+  integer :: profile_type ! type of profile
+  type(t_fparser) :: profile_parser ! profile function (A, B: transverse variables
+
+  !auxiliary variabes
+  real(p_k_part) :: v ! v
+  real(p_k_part) :: squ ! u^2 = (gamma v)^2
+  real(p_k_part) :: g ! gamma
+  real(p_k_part) :: sqg ! gamma^2
+  ! real(p_k_part) :: sqv ! v^2
+
+  real(p_k_part) :: pos_after ! position of piston at t
+  real(p_k_part) :: pos_before ! position of piston at t-dt
+
+  logical :: inbox ! true if piston is in this node
+end type t_piston
+
+
+!-----------------------------------------------------------------------------------------
+! Species particle index class
+! - Stores a list of particle indexes
+!-----------------------------------------------------------------------------------------
+
+type t_part_idx
+
+  ! indexes of particles
+  integer, dimension(:), pointer :: idx => null()
+
+  ! size of buffer
+  integer :: buf_size = 0
+
+  ! Total number of particles
+  integer :: nidx = 0
+
+  ! starting position
+  integer :: start = 1
+end type t_part_idx
+!-----------------------------------------------------------------------------------------
+
+
+!-----------------------------------------------------------------------------------------
+! Species Class
+!-----------------------------------------------------------------------------------------
+
+! max. length of species name
+integer, parameter :: p_max_spname_len = 64
+
+type :: t_species
+
+  ! current iteration that is currently held by this
+  ! t_current object. Used with CUDA to keep alert
+  ! if jay needs to be copied from the GPU to be
+  ! output for diagnostics.
+  integer :: n_current_spec = 0
+
+  ! species name
+  character(len = p_max_spname_len) :: name
+
+  ! species number - internal id
+  integer :: sp_id
+
+  ! particles per cell
+  integer, dimension(p_max_dim) :: num_par_x
+
+  ! total number of particle in one direction. this can be really big.
+  integer(p_int64), dimension(p_max_dim) :: tot_par_x
+
+  ! simulation box dimensions
+
+  ! This is shifted from the simulation box dimensions by + 0.5*dx to simplify global particle
+  ! position calculations, which are only used for injection (density profile) and diagnostics
+
+  ! The only exception is for radial cylindrical coordinates with even order interpolation, where the
+  ! algorithm also uses it during the push and requires that this is set to the same value value as
+  ! the global value
+
+  real(p_double), dimension(2, p_max_dim) :: g_box
+
+  ! simulation parameters
+  real(p_double) :: dt ! simulation time step
+  real(p_double), dimension(p_max_dim) :: dx ! cell size
+
+  integer, dimension(p_max_dim) :: g_nx ! simulation box grid size
+  real(p_double), dimension(p_x_dim) :: total_xmoved ! motion of the simulation box
+  integer, dimension(p_x_dim) :: move_num = 0 ! number of dx moved for current timestep
+  integer, dimension(3, p_max_dim) :: my_nx_p ! local grid position in global grid
+  integer :: coordinates ! coordinate system in use
+                                  ! cartesian / cylindrical
+
+  ! local node position in global grid as a single int
+  ! (used for particle tagging)
+  integer :: ngp_id
+
+  ! particle buffer size
+  integer :: num_par_max
+
+  ! number of particles in buffer
+  integer :: num_par
+
+  ! number of particles saved in update_boundary for tiles module
+  integer :: num_par_save
+
+  ! number of particles that have been created in this node
+  integer :: num_created = 0
+
+  ! mass to charge ratio
+  real(p_k_part) :: rqm ! [me/e]
+  real(p_k_part) :: rq_real, q_real ! charge of a real particle [1/e], [e]
+  real(p_k_part) :: m_real ! mass of a real particle [me]
+
+  ! essential particle data position, momentum, charge, and spin
+  real(p_k_part), dimension(:,:), pointer :: x => null()
+  real(p_k_part), dimension(:,:), pointer :: p => null()
+  real(p_k_part), dimension(:), pointer :: q => null()
+# 435 "spec/os-spec-define.f03"
+  ! define particle positions related to current cell or simulation box
+  integer :: pos_type
+  integer, dimension(:,:), pointer :: ix => null()
+
+  ! type of current deposition / field interpolation
+  integer :: interpolation
+  logical :: grid_center
+
+  ! Source
+  class( t_psource ), pointer :: source => null()
+
+  ! velocity distribution parameters
+  type( t_udist ) :: udist
+
+  ! initialize fields from initial density / momentum distribution
+  logical :: init_fields = .false.
+
+  ! initialize particle distribution (only false for tile dlb)
+  logical :: init_part = .true.
+
+  ! particle tags
+  logical :: add_tag = .false.
+  integer, dimension(:,:), pointer :: tag => null()
+
+
+  ! Free streaming species (i.e. constant velocity). dgam can still be used
+  logical :: free_stream = .false.
+
+  ! boundary conditions for this species
+  class( t_spe_bound ), pointer :: bnd_con => null()
+
+  ! diagnostic for this species
+  class( t_diag_species ), pointer :: diag => null()
+
+  ! number of timesteps between sorting of particles
+  ! n_sort = 0 turns sorting off
+  integer :: n_sort
+
+  ! switch wether to collide this species
+  logical :: if_collide
+  logical :: if_like_collide
+
+  ! local E and B fields for n_push > 1
+  ! averaged for n_push times
+  type(t_vdf), pointer :: E => NULL()
+  type(t_vdf), pointer :: B => NULL()
+
+
+  ! Numerical piston data
+  integer :: num_pistons
+  type( t_piston ), dimension(:), pointer :: pistons => NULL()
+
+  ! time-centered total energy diagnostic (this is always done in double precision)
+  ! this is set to an array to allow calculations in OpenMP parallel runs
+  real(p_double), dimension(:), pointer :: energy => null()
+
+  ! Push options
+  integer :: push_type ! type of push (standard/simd)
+  real(p_double) :: push_start_time ! delayed push
+
+  ! delayed injection options
+  logical :: if_use_delayed_injection ! type of push (standard/simd)
+  real(p_double) :: delayed_injection_time ! time to inject particles
+
+  ! Iteration tolerance of exact pusher
+  real(p_double) :: iter_tol = 1.0d-3
+
+  ! radiation reaction parameters for exact pusher
+  real(p_k_part) :: k_rr ! leading coefficient of RR
+  logical :: rad_react = .false.
+
+  ! gravity
+  real(p_k_part), dimension(p_f_dim) :: gravity ! gravitational acceleration
+
+  ! Pointer to dudt function used by some pushers
+  procedure(dudt_species), pointer :: dudt => null()
+
+  ! Pointers to current deposition routines (not used by simd code)
+  procedure(dep_current_1d), nopass, pointer :: dep_current_1d => null()
+  procedure(dep_current_2d), nopass, pointer :: dep_current_2d => null()
+  procedure(dep_current_3d), nopass, pointer :: dep_current_3d => null()
+
+  ! Next species (for storing groups of species as linked lists)
+  class(t_species), pointer :: next => null()
+
+contains
+
+  procedure :: allocate_objs => allocate_objs_spec
+  procedure :: get_n_x_dims => get_n_x_dims_spec
+  procedure :: init_buffer => init_buffer_spec
+  procedure :: grow_buffer => grow_buffer_spec
+
+  procedure :: init => init_species
+  procedure :: set_dudt => set_dudt_spec
+  procedure :: get_default_init_type => get_default_init_type_spec
+  procedure :: push => push_species
+  procedure :: get_emf => get_emf_spec
+  procedure :: read_input => read_input_species
+  procedure :: get_diag_buffer_size => get_diag_buffer_size_spec
+  procedure :: report => report_species
+  procedure :: report_energy => report_energy_species
+  procedure :: fill_data => fill_data_species
+  procedure :: get_phasespace_axis => get_phasespace_axis_spec
+  procedure :: reshape => reshape_spec
+  procedure :: add_particle_load => add_particle_load_spec
+
+  procedure :: get_quant => get_quant_spec
+  procedure :: deposit_density => deposit_density_spec
+  procedure :: enumerate_quants => enumerate_quants_spec
+  procedure :: update_boundary => update_boundary_species
+  procedure :: phys_boundary => phys_boundary_species
+  procedure :: cleanup => cleanup_species
+
+  procedure :: inject => species_inject
+  procedure :: create_particle_single_cell_p => create_particle_single_cell_p
+  procedure :: create_particle_single_cell => create_particle_single_cell
+
+  procedure :: list_algorithm => list_algorithm_spec
+  procedure :: position_single_4
+  procedure :: position_single_8
+  procedure :: position_range_comp_4
+  procedure :: position_range_comp_8
+  procedure :: position_idx_comp_4
+  procedure :: position_idx_comp_8
+  procedure :: position_ref_box_idx_comp_4
+  procedure :: position_ref_box_idx_comp_8
+  procedure :: position_range_full_4
+  procedure :: position_range_full_8
+  generic :: get_position => position_single_4, position_single_8, &
+                               position_range_comp_4, position_range_comp_8, &
+                               position_idx_comp_4, position_idx_comp_8, &
+                               position_ref_box_idx_comp_4, position_ref_box_idx_comp_8, &
+                               position_range_full_4, position_range_full_8
+
+  procedure :: get_energy
+
+
+
+
+
+
+  generic :: create_particle => create_particle_single_cell_p, create_particle_single_cell
+
+  procedure :: validate => validate_spec
+
+  procedure :: restart_write => restart_write_species
+  procedure :: restart_read => restart_read_species
+
+end type t_species
+!-----------------------------------------------------------------------------------------
+
+abstract interface
+  subroutine dudt_species( this, emf, dt, i0, i1, energy, time )
+    import t_species, t_emf, p_double
+
+    class( t_species ), intent(inout) :: this
+    class( t_emf ), intent(in) :: emf
+    real(p_double), intent(in) :: dt
+    integer, intent(in) :: i0, i1
+    real(p_double), intent(inout) :: energy
+    real(p_double), intent(in) :: time
+  end subroutine
+end interface
+# 615 "spec/os-spec-define.f03"
+interface
+  subroutine dep_current_1d( jay, dxi, xnew, ixold, xold, q, rgamma, u, np, dt )
+    import t_vdf, p_k_part, p_double
+
+    type( t_vdf ), intent(inout) :: jay
+    integer, dimension(:,:), intent(inout) :: dxi, ixold
+    real(p_k_part), dimension(:,:), intent(inout) :: xnew, xold ,u
+    real(p_k_part), dimension(:), intent(inout) :: q,rgamma
+    integer, intent(in) :: np
+    real(p_double), intent(in) :: dt
+  end subroutine
+end interface
+
+interface
+  subroutine dep_current_2d( jay, dxi, xnew, ixold, xold, q, rgamma, u, np, dt )
+    import t_vdf, p_k_part, p_double
+
+    type( t_vdf ), intent(inout) :: jay
+    integer, dimension(:,:), intent(inout) :: dxi, ixold
+    real(p_k_part), dimension(:,:), intent(inout) :: xnew, xold ,u
+    real(p_k_part), dimension(:), intent(inout) :: q,rgamma
+    integer, intent(in) :: np
+    real(p_double), intent(in) :: dt
+  end subroutine
+end interface
+
+interface
+  subroutine dep_current_3d( jay, dxi, xnew, ixold, xold, q, np, dt )
+    import t_vdf, p_k_part, p_double
+
+    type( t_vdf ), intent(inout) :: jay
+    integer, dimension(:,:), intent(inout) :: dxi, ixold
+    real(p_k_part), dimension(:,:), intent(inout) :: xnew, xold
+    real(p_k_part), dimension(:), intent(inout) :: q
+    integer, intent(in) :: np
+    real(p_double), intent(in) :: dt
+  end subroutine
+end interface
+
+interface
+  subroutine restart_write_species( this, restart_handle )
+    import t_species, t_restart_handle
+
+    class( t_species ), intent(in) :: this
+    type( t_restart_handle ), intent(inout) :: restart_handle
+  end subroutine
+end interface
+
+interface
+  subroutine restart_read_species( this, restart_handle )
+    import t_species, t_restart_handle
+
+    class( t_species ), intent(inout) :: this
+    type( t_restart_handle ), intent(in) :: restart_handle
+  end subroutine
+end interface
+
+! this extra type necessary to make an array of pointers in fortran
+type :: t_spec_arr
+
+  class( t_species ), pointer :: s => null()
+
+end type t_spec_arr
+
+interface
+  subroutine init_tmp_buf_current_spe_bnd()
+  end subroutine
+end interface
+
+interface
+  subroutine cleanup_tmp_buf_current_spe_bnd()
+  end subroutine
+end interface
+
+interface
+  subroutine init_species( this, sp_id, interpolation, grid_center, grid, g_space, emf, jay, &
+              no_co, send_vdf, recv_vdf, bnd_cross, node_cross, send_spec, &
+              recv_spec, ndump_fac, restart, restart_handle, sim_options, tstep, tmin, tmax )
+
+  import t_species, t_emf, t_current, t_space, t_grid, t_node_conf, t_restart_handle, &
+         t_options, t_vdf_msg, t_part_idx, t_spec_msg, p_double, t_time_step
+
+  class( t_species ), intent(inout) :: this
+
+  integer, intent(in) :: sp_id
+  integer, intent(in) :: interpolation
+  logical, intent(in) :: grid_center
+  class( t_grid ), intent(in) :: grid
+  type( t_space ), intent(in) :: g_space
+  class( t_emf ), intent(inout) :: emf
+  class( t_current ), intent(inout) :: jay
+  class( t_node_conf ), intent(in) :: no_co
+  type(t_vdf_msg), dimension(2), intent(inout) :: send_vdf, recv_vdf
+  type( t_part_idx ), dimension(2), intent(inout) :: bnd_cross
+  type( t_part_idx ), intent(inout) :: node_cross
+  type( t_spec_msg ), dimension(2), intent(inout) :: send_spec, recv_spec
+  integer, intent(in) :: ndump_fac
+  logical, intent(in) :: restart
+  type( t_restart_handle ), intent(in) :: restart_handle
+  type(t_options), intent(in) :: sim_options
+  type( t_time_step ), intent(in) :: tstep
+  real(p_double), intent(in) :: tmin, tmax
+
+  end subroutine
+end interface
+
+interface
+  subroutine set_dudt_spec( this )
+
+    import t_species
+
+    class( t_species ), intent(inout) :: this
+
+  end subroutine
+end interface
+
+interface
+  subroutine push_species( this, emf, current, t, tstep, tid, n_threads, options )
+
+  import t_species, t_emf, t_vdf, p_double, t_time_step, t_options
+
+  class( t_species ), intent(inout) :: this
+  class( t_emf ), intent( inout ) :: emf
+  type( t_vdf ), intent(inout) :: current
+
+  real(p_double), intent(in) :: t
+  type( t_time_step ), intent(in) :: tstep
+  integer, intent(in) :: tid ! local thread id
+  integer, intent(in) :: n_threads ! total number of threads
+  type( t_options ), intent(in) :: options
+
+  end subroutine
+end interface
+
+interface
+  subroutine get_emf_spec( this, emf, bp, ep, np, ptrcur, t )
+
+    import t_species, t_emf, p_k_part, p_double
+
+    class( t_species ), intent(in) :: this
+    class( t_emf ), intent(in), target :: emf
+    real(p_k_part), dimension(:,:), intent(out) :: bp, ep
+    integer, intent(in) :: np, ptrcur
+    real(p_double), intent(in), optional :: t
+
+  end subroutine
+end interface
+
+interface
+  subroutine read_input_species( this, input_file, def_name, periodic, if_move, grid, &
+               dt, read_prof, sim_options )
+
+  import t_species, t_input_file, t_options, p_double, t_grid
+
+  class( t_species ), intent(inout) :: this
+  class( t_input_file ), intent(inout) :: input_file
+
+  character(len = *), intent(in) :: def_name
+  logical, dimension(:), intent(in) :: periodic, if_move
+  class( t_grid ), intent(in) :: grid
+
+  real(p_double), intent(in) :: dt
+  logical, intent(in) :: read_prof
+
+  type(t_options), intent(in) :: sim_options
+
+  end subroutine
+end interface
+
+interface
+  subroutine get_diag_buffer_size_spec( spec, gnx, diag_buffer_size )
+
+  import t_species
+
+  class( t_species ), intent(in) :: spec
+  integer, dimension(:), intent(in) :: gnx
+  integer, intent(inout) :: diag_buffer_size
+  end subroutine
+end interface
+
+interface
+  subroutine report_species( this, emf, g_space, grid, no_co, tstep, t, tmin, send_msg, recv_msg )
+
+  import t_species, t_emf, t_space, t_grid, t_node_conf, t_time_step, p_double, t_vdf_msg
+
+  class( t_species ), intent(inout) :: this
+  class( t_emf ), intent(inout) :: emf
+  type( t_space ), intent(in) :: g_space
+  class( t_grid ), intent(in) :: grid
+  class( t_node_conf ), intent(in) :: no_co
+  type( t_time_step ), intent(in) :: tstep
+  real(p_double), intent(in) :: t, tmin
+  type(t_vdf_msg), dimension(2), intent(inout) :: send_msg, recv_msg
+
+  end subroutine
+end interface
+
+interface
+  subroutine report_energy_species( this, no_co, tstep, t, tmin )
+
+  import t_species, t_node_conf, t_time_step, p_double
+
+  class( t_species ), intent(in) :: this
+  class( t_node_conf ), intent(in) :: no_co
+  type( t_time_step ), intent(in) :: tstep
+  real(p_double), intent(in) :: t, tmin
+
+  end subroutine
+end interface
+
+interface
+  subroutine fill_data_species(this, tstep)
+  import t_species, t_time_step
+  class( t_species ), intent(inout) :: this
+  type( t_time_step ), intent(in) :: tstep
+  end subroutine
+end interface
+
+interface
+  subroutine get_phasespace_axis_spec( spec, xp, l, lp, x_or_p, xp_dim )
+
+  import t_species, p_diag_prec
+
+  class(t_species), intent(in) :: spec
+  real(p_diag_prec), dimension(:), intent(out) :: xp
+  integer, intent(in) :: l, lp
+  integer, intent(in) :: x_or_p
+  integer, intent(in) :: xp_dim
+
+  end subroutine
+end interface
+
+interface
+  subroutine reshape_spec( this, old_grid, new_grid, msg_patt, no_co, send_msg, recv_msg )
+
+  import t_species, t_msg_patt, t_grid, t_node_conf, t_vdf_msg
+
+  class( t_species ), intent(inout) :: this
+  type( t_msg_patt ), intent(in) :: msg_patt
+  class( t_grid ), intent(in) :: old_grid, new_grid
+  class( t_node_conf ), intent(in) :: no_co
+  type(t_vdf_msg), dimension(2), intent(inout) :: send_msg, recv_msg
+
+  end subroutine
+end interface
+
+interface
+  subroutine add_particle_load_spec( this, grid, emf )
+
+  import t_species, t_grid, t_emf
+
+  class( t_species ), intent(in) :: this
+  class( t_grid ), intent(inout) :: grid
+  class( t_emf ), intent(in) :: emf
+
+  end subroutine
+end interface
+
+interface
+  subroutine get_quant_spec( this, i1, i2, quant, q )
+
+  import t_species, p_k_part
+
+  class( t_species ), intent(in) :: this
+  integer, intent(in) :: i1, i2
+  integer, intent(in) :: quant
+  real(p_k_part), dimension(:), intent(out) :: q
+
+  end subroutine
+end interface
+
+interface
+  subroutine deposit_density_spec( this, charge, i1, i2, q )
+
+  import t_species, t_vdf, p_k_part
+
+  class( t_species ), intent(in) :: this
+  type( t_vdf ), intent(inout) :: charge
+  integer, intent(in) :: i1, i2
+  real(p_k_part), dimension(:), intent(in) :: q
+  end subroutine
+end interface
+
+interface
+  subroutine enumerate_quants_spec( this, diagFile, track_set )
+
+  import t_species, t_diag_file, t_track_set
+
+  class( t_species ), intent(in) :: this
+  class( t_diag_file ),intent(inout) :: diagFile
+  type( t_track_set ), intent(inout) :: track_set
+
+  end subroutine
+end interface
+
+interface
+  subroutine update_boundary_species( this, jay, no_co, dt, bnd_cross, node_cross, send_msg, recv_msg )
+
+    import t_species, t_vdf, t_node_conf, p_double, t_current, t_part_idx, t_spec_msg
+
+    class( t_species ), intent(inout) :: this
+    class( t_current ), intent(inout) :: jay
+    class( t_node_conf ), intent(in) :: no_co
+    real(p_double), intent(in) :: dt
+    type( t_part_idx ), dimension(2), intent(inout) :: bnd_cross
+    type( t_part_idx ), intent(inout) :: node_cross
+    type( t_spec_msg ), dimension(2), intent(inout) :: send_msg, recv_msg
+
+  end subroutine
+end interface
+
+interface
+  subroutine phys_boundary_species( this, current, dt, i_dim, bnd_idx, par_idx, npar )
+
+    import t_species, t_current, p_double
+
+    class( t_species ), intent(inout) :: this
+    class( t_current ), intent(inout) :: current
+    real(p_double), intent(in) :: dt
+    integer, intent(in) :: i_dim, bnd_idx
+    integer, dimension(:), intent(in) :: par_idx
+    integer, intent(in) :: npar
+
+  end subroutine
+end interface
+
+interface
+  subroutine cleanup_species( this )
+  import t_species
+  class( t_species ), intent(inout) :: this
+  end subroutine
+end interface
+
+!-----------------------------------------------------------------------------------------
+! Fortran 2003 detritus required for the species utility proceedures
+!-----------------------------------------------------------------------------------------
+interface
+  subroutine species_inject( this, ig_xbnd_inj, jay, no_co, bnd_cross, node_cross, send_msg, recv_msg )
+
+    import t_species, t_current, t_node_conf, t_part_idx, t_spec_msg
+
+    class( t_species ), intent(inout) :: this
+    integer, dimension(:, :), intent(in) :: ig_xbnd_inj
+    class( t_current ), intent(inout) :: jay
+    class( t_node_conf ), intent(in) :: no_co
+    type( t_part_idx ), dimension(2), intent(inout) :: bnd_cross
+    type( t_part_idx ), intent(inout) :: node_cross
+    type( t_spec_msg ), dimension(2), intent(inout) :: send_msg, recv_msg
+
+  end subroutine
+end interface
+
+interface
+  subroutine create_particle_single_cell( this, ix, x, q)
+
+    import t_species, p_k_part
+
+    class(t_species), intent(inout) :: this
+    integer, dimension(:), intent(in) :: ix
+    real(p_k_part), dimension(:), intent(in) :: x
+    real(p_k_part), intent(in) :: q
+
+  end subroutine
+end interface
+
+interface
+  subroutine create_particle_single_cell_p( this, ix, x, p, q )
+
+    import t_species, p_k_part
+
+    class(t_species), intent(inout) :: this
+    integer, dimension(:), intent(in) :: ix
+    real(p_k_part), dimension(:), intent(in) :: x
+    real(p_k_part), dimension(:), intent(in) :: p
+    real(p_k_part), intent(in) :: q
+
+  end subroutine
+end interface
+# 1011 "spec/os-spec-define.f03"
+!-----------------------------------------------------------------------------------------
+
+public :: t_diag_species, t_track, t_track_set
+public :: t_phasespace_diagnostics, t_phasespace, t_phasespace_list, t_phasespace_params
+public :: t_spe_bound, t_spec_msg, t_piston, t_species, t_part_idx, t_udist
+public :: t_spec_arr
+
+!public :: p_none, p_uniform, p_pw_linear, p_gaussian, p_channel, p_sphere, p_func
+public :: p_cell_near, p_cell_low
+public :: p_spec_buf_block
+
+public :: p_max_spname_len
+
+!-----------------------------------------------------------------------------------------
+! Density profile definitions
+!-----------------------------------------------------------------------------------------
+# 1 "spec/psource/os-psource-def.f03" 1
+
+! This file is meant to be included through an #include statement
+
+!-----------------------------------------------------------------------------------------
+! Particle source abstract class definitions
+!-----------------------------------------------------------------------------------------
+type, abstract :: t_psource
+
+contains
+    procedure(if_inject_int), deferred :: if_inject
+    procedure(read_input_int), deferred :: read_input
+    procedure(cleanup_int), deferred :: cleanup
+    procedure(inject_int), deferred :: inject
+end type
+
+public :: t_psource
+
+
+abstract interface
+
+function if_inject_int(this)
+    import t_psource
+    logical :: if_inject_int
+    class(t_psource), intent(in) :: this
+end function if_inject_int
+
+end interface
+
+
+abstract interface
+
+subroutine read_input_int(this, input_file, coordinates )
+    import t_psource, t_input_file
+    class(t_psource), intent(inout) :: this
+    class(t_input_file), intent(inout) :: input_file
+    integer, intent(in) :: coordinates
+end subroutine read_input_int
+
+end interface
+
+abstract interface
+
+subroutine cleanup_int( this )
+    import t_psource
+    class(t_psource), intent(inout) :: this
+end subroutine cleanup_int
+
+end interface
+
+
+abstract interface
+
+function inject_int( this, species, ig_xbnd_inj, jay, no_co, bnd_cross, node_cross, &
+                             send_msg, recv_msg )
+    import t_psource, t_species, t_current, t_node_conf, t_part_idx, t_spec_msg
+    class(t_psource), intent(inout) :: this
+    class(t_species), intent(inout), target :: species
+    integer, dimension(:, :), intent(in) :: ig_xbnd_inj
+    class( t_current ), intent(inout) :: jay
+    class( t_node_conf ), intent(in) :: no_co
+      type( t_part_idx ), dimension(2), intent(inout) :: bnd_cross
+      type( t_part_idx ), intent(inout) :: node_cross
+      type( t_spec_msg ), dimension(2), intent(inout) :: send_msg, recv_msg
+
+    integer :: inject_int
+end function inject_int
+
+end interface
+# 1028 "spec/os-spec-define.f03" 2
+
+
+contains
+
+subroutine allocate_objs_spec( this )
+!-----------------------------------------------------------------------------------------
+! Allocate any objects contained within the species (t_species) object
+!-----------------------------------------------------------------------------------------
+
+  implicit none
+
+  class( t_species ), intent(inout) :: this
+
+  ! Allocate default t_diag_species object class
+  if ( .not. associated( this%diag ) ) then
+    allocate( this%diag )
+  endif
+
+  ! Allocate default t_spe_bound object class
+  if ( .not. associated( this%bnd_con ) ) then
+    allocate( this%bnd_con )
+  endif
+
+  ! If needed, 'allocate_objs' on any of classes we just made so that any subobjects are created
+  call this%diag%allocate_objs()
+  !call this%bnd_con%allocate_objs()
+
+end subroutine
+
+
+!-----------------------------------------------------------------------------------------
+! Returns the default init type for use in read_input
+!-----------------------------------------------------------------------------------------
+pure function get_default_init_type_spec( this )
+
+  implicit none
+
+  class( t_species ), intent(in) :: this
+
+  character(len = 16) :: get_default_init_type_spec
+
+  get_default_init_type_spec = "standard"
+
+end function get_default_init_type_spec
+!-----------------------------------------------------------------------------------------
+
+
+!-----------------------------------------------------------------------------------------
+! Return the number of spatial dimensions on the x buffer
+! - This will generally just be the same as p_x_dim
+! - Some simulation modes may override this
+!-----------------------------------------------------------------------------------------
+pure function get_n_x_dims_spec( this )
+
+  implicit none
+
+  class( t_species ), intent(in) :: this
+  integer :: get_n_x_dims_spec
+
+  get_n_x_dims_spec = p_x_dim
+
+end function get_n_x_dims_spec
+
+!-----------------------------------------------------------------------------------------
+! Return species kinetic energy on local node
+!-----------------------------------------------------------------------------------------
+function get_energy( this )
+
+  implicit none
+
+  class( t_species ), intent(in) :: this
+  real( p_double ) :: get_energy
+
+  integer :: i
+  real( p_double ) :: energy, u2, gamma, kin, cell_volume
+
+  ! Check if energy was calculated during the push (time-centered), otherwise
+  ! calculate it here
+  if ( this % energy(1) == p_ene_recalc ) then
+     ! Energy not available, recalculate it
+     energy = 0
+
+     !$omp parallel do private(u2, gamma, kin) reduction(+ : energy)
+     do i = 1, this%num_par
+        u2 = this%p(1,i)**2 + this%p(2,i)**2 + this%p(3,i)**2
+        gamma = sqrt( u2 + 1 )
+        kin = u2 / (gamma + 1)
+        energy = energy + this%q(i) * kin
+     enddo
+     !$omp end parallel do
+
+     ! Store value so it can be reused
+     this%energy(1) = energy
+
+     do i = 2, ubound(this % energy, 1)
+        this % energy(i) = 0
+     enddo
+
+
+  else
+
+     ! Get energy calculated previously
+     energy = this % energy(1)
+
+
+     ! If doing a multi-threaded run, add contribution from all threads
+     do i = 2, ubound(this % energy, 1)
+        energy = energy + this % energy(i)
+     enddo
+
+
+  endif
+
+  ! Normalize to cell size and charge over mass ratio
+  cell_volume = this % dx(1)
+  do i = 2, p_x_dim
+    cell_volume = cell_volume * this % dx(i)
+  enddo
+
+  get_energy = energy * this%rqm * cell_volume
+
+
+end function get_energy
+!-----------------------------------------------------------------------------------------
+
+
+!-----------------------------------------------------------------------------------------
+! get_position routines
+!
+! These routines return particle positions indexed to the global simulation box
+! - For these to work the species%g_box( p_lower, : ) needs to be shifted 0.5 cells
+! with respect to the global simulation box. See the t_species definition for details
+!-----------------------------------------------------------------------------------------
+
+
+
+!-----------------------------------------------------------------------------------------
+subroutine position_idx_comp_4( this, comp, idx, np, pos )
+!-----------------------------------------------------------------------------------------
+
+
+   implicit none
+
+   class( t_species ), intent(in) :: this
+   integer, intent(in) :: comp
+   integer, intent(in), dimension(:) :: idx
+   integer, intent(in) :: np
+   real( p_single ), dimension(:), intent(out) :: pos
+
+   integer :: j, ixmin
+   real( p_single ) :: xmin, dx
+
+   xmin = real( this%g_box( p_lower, comp ), p_single )
+   ixmin = this%my_nx_p( 1, comp ) - 2
+   dx = real( this%dx( comp ), p_single )
+
+   do j = 1, np
+    pos(j) = xmin + dx * real((this%ix( comp, idx(j) ) + ixmin) + &
+                               this%x ( comp, idx(j) ) , p_single )
+   enddo
+
+end subroutine position_idx_comp_4
+!-----------------------------------------------------------------------------------------
+
+!-----------------------------------------------------------------------------------------
+!-----------------------------------------------------------------------------------------
+subroutine position_idx_comp_8( this, comp, idx, np, pos )
+
+   implicit none
+
+   class( t_species ), intent(in) :: this
+   integer, intent(in) :: comp
+   integer, intent(in), dimension(:) :: idx
+   integer, intent(in) :: np
+   real( p_double ), dimension(:), intent(out) :: pos
+
+   integer :: j, ixmin
+   real( p_double ) :: xmin, dx
+
+   xmin = this%g_box( p_lower, comp )
+   ixmin = this%my_nx_p( 1, comp ) - 2
+   dx = this%dx( comp )
+
+   do j = 1, np
+    pos(j) = xmin + dx * (real(( this%ix( comp, idx(j) ) + ixmin), p_double ) + &
+                                 this%x( comp, idx(j) ) )
+   enddo
+
+end subroutine position_idx_comp_8
+!-----------------------------------------------------------------------------------------
+
+!-----------------------------------------------------------------------------------------
+subroutine position_ref_box_idx_comp_4( this, comp, idx, np, pos, if_pos_ref_box )
+
+   implicit none
+
+   class( t_species ), intent(in) :: this
+   integer, intent(in) :: comp
+   integer, intent(in), dimension(:) :: idx
+   integer, intent(in) :: np
+   real( p_single ), dimension(:), intent(out) :: pos
+   logical, intent(in) :: if_pos_ref_box
+
+   integer :: j, ixmin
+   real( p_single ) :: xmin, dx
+
+   if (if_pos_ref_box) then
+      xmin = 0.0_p_single
+   else
+      xmin = real( this%g_box( p_lower, comp ), p_single )
+   endif
+   ixmin = this%my_nx_p( 1, comp ) - 2
+   dx = real( this%dx( comp ), p_single )
+
+   do j = 1, np
+    pos(j) = xmin + dx * real((this%ix( comp, idx(j) ) + ixmin) + &
+                               this%x ( comp, idx(j) ) , p_single )
+   enddo
+
+end subroutine position_ref_box_idx_comp_4
+!-----------------------------------------------------------------------------------------
+
+!-----------------------------------------------------------------------------------------
+subroutine position_ref_box_idx_comp_8( this, comp, idx, np, pos, if_pos_ref_box )
+
+   implicit none
+
+   class( t_species ), intent(in) :: this
+   integer, intent(in) :: comp
+   integer, intent(in), dimension(:) :: idx
+   integer, intent(in) :: np
+   real( p_double ), dimension(:), intent(out) :: pos
+   logical, intent(in) :: if_pos_ref_box
+
+   integer :: j, ixmin
+   real( p_double ) :: xmin, dx
+
+   if (if_pos_ref_box) then
+      xmin = 0.0_p_double
+   else
+      xmin = this%g_box( p_lower, comp )
+   endif
+   ixmin = this%my_nx_p( 1, comp ) - 2
+   dx = this%dx( comp )
+
+   do j = 1, np
+    pos(j) = xmin + dx * (real(( this%ix( comp, idx(j) ) + ixmin), p_double ) + &
+                                 this%x( comp, idx(j) ) )
+   enddo
+
+end subroutine position_ref_box_idx_comp_8
+!-----------------------------------------------------------------------------------------
+
+!-----------------------------------------------------------------------------------------
+
+subroutine position_single_4( this, idx, pos )
+
+   implicit none
+
+   class( t_species ), intent(in) :: this
+   integer, intent(in) :: idx
+   real( p_single ), dimension(:), intent(out) :: pos
+
+   integer :: j
+
+   do j = 1, p_x_dim
+    pos(j) = real( ( (this%ix( j, idx ) + this%my_nx_p(p_lower, j) - 2) + &
+                      this%x( j, idx ) ) * this%dx( j ) + &
+                      this%g_box( p_lower, j ), p_single )
+   enddo
+
+end subroutine position_single_4
+!-----------------------------------------------------------------------------------------
+
+
+!-----------------------------------------------------------------------------------------
+
+!-----------------------------------------------------------------------------------------
+subroutine position_single_8( this, idx, pos )
+
+   implicit none
+
+   class( t_species ), intent(in) :: this
+   integer, intent(in) :: idx
+   real( p_double ), dimension(:), intent(out) :: pos
+
+   integer :: j
+
+   do j = 1, p_x_dim
+    pos(j) = this%g_box( p_lower, j ) + this%dx( j ) * &
+               ( real((this%ix( j, idx ) + this%my_nx_p(p_lower, j) - 2), p_double) + &
+                       this%x( j, idx ) )
+   enddo
+
+end subroutine position_single_8
+!-----------------------------------------------------------------------------------------
+
+
+!-----------------------------------------------------------------------------------------
+
+subroutine position_range_comp_4( this, comp, idx0, idx1, pos )
+!-----------------------------------------------------------------------------------------
+
+
+   implicit none
+
+   class( t_species ), intent(in) :: this
+   integer, intent(in) :: comp, idx0, idx1
+   real( p_single ), dimension(:), intent(out) :: pos
+
+   integer :: j, ixmin
+   real( p_single ) :: xmin, dx
+
+   xmin = real( this%g_box( p_lower, comp ), p_single )
+   ixmin = this%my_nx_p( 1, comp ) - 2
+   dx = real( this%dx( comp ), p_single )
+
+   do j = idx0, idx1
+    pos(j-idx0+1) = xmin + dx * (real(( this%ix( comp, j ) + ixmin ) + &
+                                        this%x( comp, j ), p_single ) )
+   enddo
+
+end subroutine position_range_comp_4
+!-----------------------------------------------------------------------------------------
+
+
+!-----------------------------------------------------------------------------------------
+
+subroutine position_range_comp_8( this, comp, idx0, idx1, pos )
+!-----------------------------------------------------------------------------------------
+
+
+   implicit none
+
+   class( t_species ), intent(in) :: this
+   integer, intent(in) :: comp, idx0, idx1
+   real( p_double ), dimension(:), intent(out) :: pos
+
+   integer :: j, ixmin
+   real( p_double ) :: xmin, dx
+
+   xmin = this%g_box( p_lower, comp )
+   ixmin = this%my_nx_p( 1, comp ) - 2
+   dx = this%dx( comp )
+
+   do j = idx0, idx1
+    pos(j-idx0+1) = xmin + dx * (real(( this%ix( comp, j ) + ixmin ), p_double ) + &
+                                        this%x( comp, j ) )
+   enddo
+
+end subroutine position_range_comp_8
+!-----------------------------------------------------------------------------------------
+
+!-----------------------------------------------------------------------------------------
+
+subroutine position_range_full_4( this, idx0, idx1, pos )
+!-----------------------------------------------------------------------------------------
+
+
+   implicit none
+
+   class( t_species ), intent(in) :: this
+   integer, intent(in) :: idx0, idx1
+   real( p_single ), dimension(:,:), intent(out) :: pos
+
+   integer :: j
+   integer ixmin(p_x_dim)
+
+   real( p_single ) :: xmin( p_x_dim ), dx( p_x_dim )
+
+   xmin(1:p_x_dim) = real( this%g_box( p_lower, 1:p_x_dim ), p_single )
+   ixmin(1:p_x_dim) = this%my_nx_p( 1, 1:p_x_dim ) - 2
+   dx(1:p_x_dim) = real( this%dx( 1:p_x_dim ), p_single )
+
+   do j = idx0, idx1
+    pos(:,j-idx0+1) = xmin(:) + dx(:) * (real(( this%ix( :, j ) + ixmin(:) ) + &
+                                        this%x( :, j ), p_single ) )
+   enddo
+
+end subroutine position_range_full_4
+!-----------------------------------------------------------------------------------------
+
+
+!-----------------------------------------------------------------------------------------
+
+subroutine position_range_full_8( this, idx0, idx1, pos )
+!-----------------------------------------------------------------------------------------
+
+
+   implicit none
+
+   class( t_species ), intent(in) :: this
+   integer, intent(in) :: idx0, idx1
+   real( p_double ), dimension(:,:), intent(out) :: pos
+
+   integer :: j, ixmin(p_x_dim)
+   real( p_double ) :: xmin(p_x_dim), dx(p_x_dim)
+
+   xmin(1:p_x_dim) = this%g_box( p_lower, 1:p_x_dim )
+   ixmin(1:p_x_dim) = this%my_nx_p( 1, 1:p_x_dim ) - 2
+   dx(1:p_x_dim) = this%dx(1:p_x_dim)
+
+   do j = idx0, idx1
+    pos(:,j-idx0+1) = xmin(:) + dx(:) * (real(( this%ix( :, j ) + ixmin( : ) ) + &
+                                        this%x( :, j ), p_double ) )
+   enddo
+
+end subroutine position_range_full_8
+!-----------------------------------------------------------------------------------------
+
+!-----------------------------------------------------------------------------------------
+! Printout the algorithm used by the pusher
+!-----------------------------------------------------------------------------------------
+subroutine list_algorithm_spec( this )
+
+  implicit none
+  class( t_species ), intent(in) :: this
+
+  print *, ' '
+  print *, trim(this%name),' :'
+
+  ! Push type
+  select case ( this%push_type )
+  case (p_std)
+    print *, '- Standard (Boris) pusher'
+  case (p_simd)
+    print *, '- SIMD optimized pusher'
+  case (p_radcool)
+    print *, '- Radiation cooling'
+  case (p_vay)
+    print *, '- Vay velocity push'
+  case (p_fullrot)
+    print *, '- Full magnetic rotation pusher'
+  case (p_euler)
+    print *, '- Euler-Rodriguez magnetic rotation pusher'
+  case (p_cond_vay)
+    print *, '- Conditional (gamma>5) standard/Vay pusher'
+  case (p_cary)
+    print *, '- Higuera-Cary pusher'
+  case (p_exact)
+    print *, '- Exact pusher'
+  case (p_exact_rr)
+    print *, '- Exact pusher with radiation reaction'
+  end select
+
+  if ( this%free_stream ) then
+    print *, '- Free streaming particles (no dudt)'
+  write(0,*) '- (*warning*) ', trim(this%name), ' are free streaming!'
+  endif
+
+end subroutine list_algorithm_spec
+!-----------------------------------------------------------------------------------------
+
+!-----------------------------------------------------------------------------------------
+! Allocate buffers for particle quantities
+!-----------------------------------------------------------------------------------------
+subroutine init_buffer_spec( this, num_par_req )
+
+  implicit none
+
+  class(t_species), intent(inout) :: this
+  integer, intent(in) :: num_par_req
+
+  integer :: n_x_dim
+
+  ! The buffer size must always be a multiple of vector width in size because of SIMD code
+  this%num_par_max = (( num_par_req + p_vecwidth - 1 ) / p_vecwidth) * p_vecwidth
+
+  ! Under some compilers / configurations (e.g. gfortran 4.9.1, OS X, single precision)
+  ! if the total q buffer size is below 1Kb it may not be allocated to a 32bit boundary
+  ! which is required by AVX code
+  if ( this%num_par_max < 256 ) this%num_par_max = 256
+
+  ! setup position buffer
+  n_x_dim = this%get_n_x_dims()
+  call freemem(this%x,"spec/os-spec-define.f03",1503)
+  call alloc(this%x, (/ n_x_dim, this%num_par_max /),"spec/os-spec-define.f03",1504)
+
+  ! initialize particle cell information
+  call freemem(this%ix,"spec/os-spec-define.f03",1507)
+  call alloc(this%ix, (/ p_x_dim, this%num_par_max /),"spec/os-spec-define.f03",1508)
+
+  ! setup momenta buffer
+  call freemem(this%p,"spec/os-spec-define.f03",1511)
+  call alloc(this%p, (/ p_p_dim, this%num_par_max /),"spec/os-spec-define.f03",1512)
+# 1522 "spec/os-spec-define.f03"
+  ! setup particle charge buffer
+  call freemem(this%q,"spec/os-spec-define.f03",1523)
+  call alloc(this%q, (/ this%num_par_max /),"spec/os-spec-define.f03",1524)
+
+  ! initialize tracking data if necessary
+  if ( this%add_tag ) then
+     call freemem(this%tag,"spec/os-spec-define.f03",1528)
+     call alloc(this%tag, (/ 2, this%num_par_max /),"spec/os-spec-define.f03",1529)
+  endif
+
+end subroutine init_buffer_spec
+!-------------------------------------------------------------------------------
+
+!-------------------------------------------------------------------------------
+! Grow the particle buffers
+!-------------------------------------------------------------------------------
+subroutine grow_buffer_spec( this, num_par_req )
+
+  implicit none
+
+  class(t_species), intent(inout) :: this
+  integer, intent(in) :: num_par_req
+
+  real(p_k_part), dimension(:), pointer :: temp1_r
+  real(p_k_part), dimension(:,:), pointer :: temp2_r
+  integer, dimension(:,:), pointer :: temp2_i
+
+  integer :: num_par_old, num_par_new, n_x_dim
+
+  ! The buffer size must always be a multiple of vector width in size because of SIMD code
+  num_par_new = (( num_par_req + p_vecwidth - 1 ) / p_vecwidth) * p_vecwidth
+
+  if ( this%num_par > 0 ) then
+
+     num_par_old = this%num_par
+
+     write(0,'(A,I0,A,A)') '[', mpi_node(), '] (* warning *) resizing particle buffers for this ', &
+                            trim(this%name)
+     write(0,'(A,I0,A,I0,A,I0)') '[', mpi_node(), '] (* warning *) Buffer size: ', this%num_par_max, ' -> ', num_par_new
+     write(0,'(A,I0,A,I0)') '[', mpi_node(), &
+             '] (* warning *) Number of particles currently in buffer: ', this%num_par
+
+     if ( num_par_new <= num_par_old ) then
+       write(err_buf__,*) 'Invalid size for new buffer';call err__("spec/os-spec-define.f03",1565)
+       call abort_program( p_err_invalid )
+     endif
+
+     ! particle positions (may not be p_x_dim)
+     n_x_dim = this%get_n_x_dims()
+     call alloc(temp2_r, (/ n_x_dim, num_par_new /),"spec/os-spec-define.f03",1571)
+     call memcpy( temp2_r, this%x, n_x_dim * num_par_old )
+     call freemem(this%x,"spec/os-spec-define.f03",1573)
+     this%x => temp2_r
+
+     ! particle cell index
+     call alloc(temp2_i, (/ p_x_dim, num_par_new /),"spec/os-spec-define.f03",1577)
+     call memcpy( temp2_i, this%ix, p_x_dim * num_par_old )
+     call freemem(this%ix,"spec/os-spec-define.f03",1579)
+     this%ix => temp2_i
+
+     ! particle momenta
+     call alloc(temp2_r, (/ p_p_dim, num_par_new /),"spec/os-spec-define.f03",1583)
+     call memcpy( temp2_r, this%p, p_p_dim * num_par_old )
+     call freemem(this%p,"spec/os-spec-define.f03",1585)
+     this%p => temp2_r
+
+     ! particle charge
+     call alloc(temp1_r, (/ num_par_new /),"spec/os-spec-define.f03",1589)
+     call memcpy( temp1_r, this%q, num_par_old )
+     call freemem(this%q,"spec/os-spec-define.f03",1591)
+     this%q => temp1_r
+# 1604 "spec/os-spec-define.f03"
+     ! Resize tracking data if necessary
+     if ( this%add_tag ) then
+        call alloc(temp2_i, (/ 2, num_par_new /),"spec/os-spec-define.f03",1606)
+        call memcpy( temp2_i, this%tag, 2 * num_par_old )
+        call freemem(this%tag,"spec/os-spec-define.f03",1608)
+        this%tag => temp2_i
+     endif
+
+     ! resize ionization data if necessary
+     !(...)
+
+     this%num_par_max = num_par_new
+     write(0,'(A,I0,A)') '[', mpi_node(), '] (* warning *) resize successfull!'
+
+  else
+
+    ! no particles in buffer, simply reallocate the buffers
+    call this % init_buffer( num_par_new )
+
+  endif
+
+end subroutine grow_buffer_spec
+!-------------------------------------------------------------------------------
+
+!-------------------------------------------------------------------------------
+! Checks if all particle values are ok.
+!-------------------------------------------------------------------------------
+subroutine validate_spec( this, msg, over )
+
+  implicit none
+
+  ! dummy variables
+
+  class(t_species), intent(in) :: this
+  character( len = * ) , intent(in) :: msg
+  logical, intent(in), optional :: over
+
+  ! local variables
+  integer :: i_dim, k
+  integer, dimension(p_x_dim) :: ilb, iub
+  logical :: over_
+
+  ! Verify buffers
+  if ((.not. associated(this%x)) .or. (.not. associated(this%ix)) .or. &
+      (.not. associated(this%p)) .or. (.not. associated(this%q))) then
+
+    write(0,'(A,I0,A,A)') '[', mpi_node(), '] ', trim(msg)
+    write(0,*) '[', mpi_node(), '] buffers are not allocated'
+    call abort_program()
+  endif
+
+  if ((size(this%x,1)/=this%get_n_x_dims()) .or. (size(this%ix,1)/=p_x_dim) .or. &
+      (size(this%p,1)/=p_p_dim)) then
+        write(0,'(A,I0,A,A)') '[', mpi_node(), '] ', trim(msg)
+        write(0,*) '[', mpi_node(), '] buffer dimensions are invalid'
+        call abort_program()
+      endif
+
+    if ((size(this%x,2)/=this%num_par_max) .or. (size(this%ix,2)/=this%num_par_max) .or. &
+        (size(this%p,2)/=this%num_par_max) .or. (size(this%q)/=this%num_par_max)) then
+        write(0,'(A,I0,A,A)') '[', mpi_node(), '] ', trim(msg)
+        write(0,*) '[', mpi_node(), '] buffer size is invalid'
+        call abort_program()
+    endif
+
+  ! get grid boundaries
+  do k = 1, p_x_dim
+    ilb(k) = 1 - this%move_num(k)
+    iub(k) = this%my_nx_p(3,k)
+  enddo
+
+  if ( present( over) ) then
+    over_ = over
+  else
+    over_ = .false.
+  endif
+
+  ! allow for 1 cell overflow (ok before update boundary)
+  if ( over_ ) then
+    ilb = ilb - 1
+    iub = iub + 1
+  endif
+
+  ! validate positions
+  do i_dim = 1, p_x_dim
+    do k = 1, this%num_par
+       if ( ( this%x(i_dim, k) < -0.5_p_k_part ) .or. &
+            ( this%x(i_dim, k) >= 0.5_p_k_part ) .or. &
+            ( this%ix(i_dim, k) < ilb( i_dim ) ) .or. &
+            ( this%ix(i_dim, k) > iub( i_dim) ) ) then
+
+                print *, "[",mpi_node(),"] ",'over = ', over_
+                call bad_particle( k, this, ilb, iub, msg // " - Invalid position " )
+
+       endif
+    enddo
+  enddo
+
+  ! validate momenta
+  do k = 1, this%num_par
+    do i_dim = 1, p_p_dim
+       if ( isinf( this%p(i_dim, k) ) .or. isnan( this%p(i_dim, k) ) ) then
+
+          call bad_particle( k, this, ilb, iub, msg // " - Invalid momenta " )
+
+       endif
+    enddo
+  enddo
+# 1728 "spec/os-spec-define.f03"
+  ! validate charge
+  do k = 1, this%num_par
+     if ( this%q(k) == 0 .or. isinf( this%q(k) ) .or. isnan( this%q(k) ) ) then
+
+        call bad_particle( k, this, ilb, iub, msg // " - Invalid charge " )
+
+     endif
+  enddo
+
+contains
+
+subroutine bad_particle( k, this, ilb, iub, msg )
+
+  implicit none
+
+  integer, intent(in) :: k
+
+  class(t_species), intent(in) :: this
+  integer, dimension(:), intent(in) :: ilb, iub
+  character( len = * ), intent(in) :: msg
+
+  write(0,'(A,I0,A,A)') '[', mpi_node(), '] ', trim(msg)
+
+  write(0,'(A,I0,A,I0,A,I0)') "[", mpi_node(), "] Bad particle ", k, " of ", this%num_par
+  write(0,*) "[", mpi_node(), "] p (:)  =", this%p(:, k)
+  write(0,*) "[", mpi_node(), "] x (:)  =", this%x(:, k)
+  write(0,*) "[", mpi_node(), "] ix (:) =", this%ix(:, k)
+  write(0,*) "[", mpi_node(), "] q      =", this%q(k)
+
+
+
+
+
+  write(0,*) "[", mpi_node(), "] ilb(:) = ", ilb
+  write(0,*) "[", mpi_node(), "] iub(:) = ", iub
+
+  write(0,'(A,I0,A,A)') '[', mpi_node(), '] (* error *) Validate species failed for ', &
+                                            trim(this%name), ' aborting...'
+
+  call abort_program( p_err_invalid )
+
+
+end subroutine bad_particle
+
+end subroutine validate_spec
+!-------------------------------------------------------------------------------
+
+end module m_species_define

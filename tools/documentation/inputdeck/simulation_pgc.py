@@ -1,0 +1,200 @@
+
+namelist_details = {
+
+####################################################################
+#           Defintions for nl_pgc
+####################################################################
+ '/read_input_pgc/nl_pgc': {
+ 'Label':
+"""
+""",
+ 'detail-page-template':  'standard',
+ 'summary-text':
+"""
+""",
+ 'detail-page-header':
+"""
+""",
+ 'detail-page-footer':
+"""
+""",
+ 'items': [
+    ('a0',
+"""
+"""),
+    ('omega',
+"""
+"""),
+    ('free_stream',
+"""
+"""),
+    ('per_type',
+"""
+"""),
+    ('lon_type',
+"""
+"""),
+    ('lon_center',
+"""
+"""),
+    ('lon_duration',
+"""
+"""),
+    ('lon_range',
+"""
+"""),
+    ('lon_rise',
+"""
+"""),
+    ('lon_fall',
+"""
+"""),
+    ('lon_flat',
+"""
+"""),
+    ('lon_start',
+"""
+"""),
+    ('w0',
+"""
+"""),
+    ('per_focus',
+"""
+"""),
+    ('per_center',
+"""
+"""),
+    ('w0_asym',
+"""
+"""),
+    ('per_focus_asym',
+"""
+"""),
+    ('chi_smooth',
+"""
+"""),
+    ('env_smooth',
+"""
+"""),
+    ('fp_smooth',
+"""
+"""),
+    ('fp_smooth_niter',
+"""
+"""),
+    ('fp_smooth_nmax',
+"""
+"""),
+    ('solver_type',
+"""
+"""),
+    ('error_cleaning',
+"""
+"""),
+    ('source_smoothing',
+"""
+"""),
+ ]
+ },
+####################################################################
+#           Defintions for nl_neutral
+####################################################################
+ '/m_neutral_pgc/read_input_neutral_pgc/nl_neutral': {
+ 'Label':
+"""
+""",
+ 'detail-page-template':  'standard',
+ 'summary-text':
+"""
+""",
+ 'detail-page-header':
+"""
+""",
+ 'detail-page-footer':
+"""
+""",
+ 'items': [
+    ('name',
+"""
+"""),
+    ('neutral_gas',
+"""
+"""),
+    ('ion_param',
+"""
+"""),
+    ('den_min',
+"""
+"""),
+    ('e_min',
+"""
+"""),
+    ('multi_max',
+"""
+"""),
+    ('multi_min',
+"""
+"""),
+    ('if_tunnel',
+"""
+"""),
+    ('if_impact',
+"""
+"""),
+    ('inject_line',
+"""
+"""),
+ ]
+ },
+####################################################################
+#           Defintions for nl_neutral_mov_ions
+####################################################################
+ '/m_neutral_pgc/read_input_neutral_pgc/nl_neutral_mov_ions': {
+ 'Label':
+"""
+""",
+ 'detail-page-template':  'standard',
+ 'summary-text':
+"""
+""",
+ 'detail-page-header':
+"""
+""",
+ 'detail-page-footer':
+"""
+""",
+ 'items': [
+    ('name',
+"""
+"""),
+    ('neutral_gas',
+"""
+"""),
+    ('ion_param',
+"""
+"""),
+    ('den_min',
+"""
+"""),
+    ('e_min',
+"""
+"""),
+    ('multi_max',
+"""
+"""),
+    ('multi_min',
+"""
+"""),
+    ('if_tunnel',
+"""
+"""),
+    ('if_impact',
+"""
+"""),
+    ('inject_line',
+"""
+"""),
+ ]
+ },
+
+}

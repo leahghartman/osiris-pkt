@@ -1,0 +1,111 @@
+##########################################################################################
+# System specific configuration for OSIRIS
+#   System:    Leonardo DCGP
+#   Compilers: Intel family ( icc, ifort )
+#   Module list (as of May 2024):
+#   module load intel-oneapi-compilers/2023.2.1 
+#   module load intel-oneapi-mpi/2021.10.0
+#   module load hdf5/1.14.3--intel-oneapi-mpi--2021.10.0--oneapi--2023.2.0
+#   module load python/3.10.8--gcc--8.5.0
+##########################################################################################
+
+##########################################################################################
+# OSIRIS configuration
+
+# Set the following to a system optimized timer, or leave commented to use a default one
+# TIMER = __MACH_TIMER__
+
+# SIMD
+# Uncomment the following line to use SIMD optimized code. You can use SIMD = SSE 
+# or SIMD = AVX. When using AVX you must add -mavx to the compiler options
+# SIMD = SSE
+SIMD = AVX2
+
+PRECISION = DOUBLE
+
+APPEND_BRANCH = 1
+
+DISABLE_PGC = 1
+DISABLE_TILES = 1
+DISABLE_QED = 1
+DISABLE_QEDCYL = 1
+DISABLE_SHEAR = 1
+DISABLE_RAD = 1
+DISABLE_XXFEL = 1
+DISABLE_NEUTRAL_SPIN = 1
+DISABLE_GR = 1
+DISABLE_CYLMODES = 1
+DISABLE_OVERDENSE = 1
+DISABLE_OVERDENSE_CYL = 1
+DISABLE_CUDA = 1
+
+##########################################################################################
+# Compilers
+
+F90 = mpiifort
+F03 = $(F90)
+cc = mpiicc -diag-disable=10441
+cxx = $(cc)
+
+# Fortran preprocessor
+FPP = gcc -C -E -x assembler-with-cpp -nostdinc
+
+# This flag supresses some hyper-vigilant compilier warnings that have been deemed harmless. 
+# The list of warnings can be found in ./source/config.mk.warnings. If you are having some 
+# strange issues that you need to debug comment out DISABLE_PARANOIA and/or read 
+# the ./source/config.warnings file to allow the warnings if you think they may help you 
+# find the issue.
+DISABLE_PARANOIA = YES
+
+##########################################################################################
+# Fortran flags
+
+# External name mangling
+UNDERSCORE = FORTRANSINGLEUNDERSCORE
+
+# Flag to enable compilation of .f03 files (so far only intel compiler requires this)
+F03_EXTENSION_FLAG = -free -Tf
+
+# ------------------------------- Compilation Targets ------------------------------------
+
+# OpenMP Support
+# FPP += -D_OPENMP
+# F90FLAGS_all += -fopenmp
+
+# Production
+
+F90FLAGS_production = $(F90FLAGS_all) -Ofast
+
+F90FLAGS_profile    = -g $(F90FLAGS_production)
+
+##########################################################################################
+# C flags
+
+CFLAGS_production = -Ofast -mavx2
+
+CFLAGS_profile    = -g $(CFLAGS_production)
+
+##########################################################################################
+# CXX flags
+
+CXX_FLAGS_production = -Ofast -mavx2
+
+CXX_FLAGS_profile = -g $(CXX_FLAGS_production)
+
+##########################################################################################
+# Libraries
+
+# MPI
+# If using a wrapper MPI fortran compiler (e.g. mpiifort) these are not required
+# MPI_FCOMPILEFLAGS = $(shell mpif90 --showme:compile)
+# MPI_FLINKFLAGS    = $(shell mpif90 --showme:link)
+
+# MPI supports MPI_IN_PLACE reduction
+FPP += -D__HAS_MPI_IN_PLACE__
+
+# HDF5
+H5_FCOMPILEFLAGS = -I$(HDF5_INCLUDE)
+H5_FLINKFLAGS    = -L$(HDF5_LIB) -lhdf5_fortran -lhdf5 -lz -lm
+
+# Uncomment the following if HDF5 supports parallel MPIIO
+H5_HAVE_PARALLEL = 1

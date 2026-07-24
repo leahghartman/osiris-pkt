@@ -1,0 +1,141 @@
+##########################################################################################
+# System specific configuration for Polaris @ ALCF
+#   System:    Cray
+#   Compilers: GNU family ( gcc, gfortran ), Nvidia (nvcc)
+#   MPI:       Cray MPICH
+# See:
+# https://docs.alcf.anl.gov/polaris/compiling-and-linking/compiling-and-linking-overview/
+# Recommended module commands:
+#     module swap PrgEnv-nvhpc PrgEnv-gnu
+#     module load nvhpc-mixed
+#     module load gcc/11.2.0 # there is a compatibility issue with gcc 12 (defaullt) and cuda it seems
+#     module load cray-hdf5-parallel
+##########################################################################################
+
+##########################################################################################
+# OSIRIS configuration
+
+# DISABLE_TILES = 1
+DISABLE_PGC = 1
+DISABLE_QED = 1
+DISABLE_QEDCYL = 1
+DISABLE_SHEAR = 1
+DISABLE_RAD = 1
+DISABLE_XXFEL = 1
+DISABLE_NEUTRAL_SPIN = 1
+DISABLE_GR = 1
+DISABLE_CYLMODES = 1
+DISABLE_OVERDENSE = 1
+DISABLE_OVERDENSE_CYL = 1
+
+ENABLE_CUDA = 1
+
+# Numeric precision
+#PRECISION = SINGLE
+PRECISION = DOUBLE
+
+# Fortran preprocessor
+FPP = gcc -C -E -x assembler-with-cpp
+
+# SIMD = AVX2
+# SIMD_FLAGS = -march=core-avx2
+
+F90 = ftn 
+F03 = ftn  
+cc  = nvcc -arch=sm_80
+cxx = nvcc -arch=sm_80
+
+NVCC = nvcc -arch=sm_80
+
+DISABLE_PARANOIA = 1
+
+##########################################################################################
+# Fortran flags
+
+# External name mangling
+UNDERSCORE = FORTRANSINGLEUNDERSCORE
+
+F90FLAGS_all = -pipe -ffree-line-length-none -fno-range-check -cpp -fallow-argument-mismatch
+
+# Enable OpenMP code
+FPP += -D_OPENMP
+F90FLAGS_all += --openmp
+
+# # ------------------------------- Compilation Targets ------------------------------------
+
+#debug
+F90FLAGS_debug      = $(F90FLAGS_all) -g -Og -fbacktrace -fbounds-check -Wall \
+                      -fimplicit-none -Wimplicit-interface -Wconversion  -Wsurprising \
+                      -Wunderflow -ffpe-trap=invalid,zero,overflow
+
+# Production
+F90FLAGS_production = $(F90FLAGS_all) -Ofast -finline-functions
+
+# Profile with VTune
+F90FLAGS_profile    = $(F90FLAGS_all) $(F90FLAGS_production) -g
+
+
+##########################################################################################
+# NVCC flags
+
+NVCCFLAGS_all = -std=c++11 -dc
+
+#debug
+NVCCFLAGS_debug      = $(NVCCFLAGS_all) -O0 -G -g
+
+# production
+NVCCFLAGS_production = $(NVCCFLAGS_all) -O3 -dlto -use_fast_math -extra-device-vectorization
+
+# profile
+NVCCFLAGS_profile    = $(NVCCFLAGS_production) -g
+
+# for additional compilation information, add the following options to NVCCFLAGS_debug
+# -opt-info inline -res-usage --ptxas-options="-v"
+
+# note, you must also add -res-usage to CUDA_CLINKFLAGS_debug below if specified above
+
+# you can also add --nvlink-options="-v" to CUDA_CLINKFLAGS_debug
+
+
+##########################################################################################
+# C flags
+
+#debug
+CFLAGS_debug      = $(NVCCFLAGS_debug) -I$(CRAY_MPICH_PREFIX)/include 
+
+# production
+# CFLAGS_production = $(NVCCFLAGS_production) -I/opt/cray/pe/mpich/8.1.25/ofi/gnu/9.1/include 
+CFLAGS_production = $(NVCCFLAGS_production) -I$(CRAY_MPICH_PREFIX)/include 
+
+# profile
+CFLAGS_profile    = $(NVCCFLAGS_production) -g
+
+
+##########################################################################################
+# Linker flags
+
+# None required
+LDFLAGS = -lstdc++
+
+##########################################################################################
+# Libraries
+
+# MPI
+# MPI is supported through wrapper compilers, no flags required
+
+# MPI supports MPI_IN_PLACE reduction
+FPP += -D__HAS_MPI_IN_PLACE__
+
+# HDF5
+# This requires loading the hdf5-parallel module
+H5_ROOT = $(HDF5_ROOT)
+H5_FCOMPILEFLAGS = -I$(H5_ROOT)/include
+H5_FLINKFLAGS    = -L$(H5_ROOT)/lib -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 \
+                    -lz -ldl -lm -Wl,-rpath $(H5_ROOT)/lib
+# H5_HAVE_PARALLEL = 1
+
+
+CUDA_ROOT = /opt/nvidia/hpc_sdk/Linux_x86_64/22.11/cuda/
+CUDA_CLINKFLAGS_debug = -dlink
+CUDA_CLINKFLAGS_production = -dlink -dlto -lcudadevrt
+CUDA_FLINKFLAGS = -L$(CUDA_ROOT)/lib64 -lcudart -lcuda -dlto -lnvToolsExt -lcudadevrt

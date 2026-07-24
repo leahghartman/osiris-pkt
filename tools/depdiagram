@@ -1,0 +1,227 @@
+#!/usr/bin/env python
+
+"""
+depdiagram main-source-file.f90
+  
+Generate a dependencies graph in the dot format for the given fortran 90 source file
+based on module and use statements.
+
+The results are sent to stdout.
+
+When a module or include file is not found in the same directory where  main-source-file.f90 is
+located it is assumed that this is a 'system' file, and it will not be included in the
+dependencies.
+
+"""
+
+import re, sys, os, glob
+from optparse import OptionParser
+
+
+class SourceFile :
+    def __init__(self, filename ) :
+        
+        self.source   = filename
+        self.type     = 0
+        self.name     = ''
+        
+        file = open( filename, 'r' )
+        for line in file :
+            
+            prog = re.match( "\s*program (\S+)\s*", line.lower())
+            if ( prog ) :
+                self.type = 1
+                self.name = prog.group(1)
+                break
+            
+            mod = re.match( "\s*module (\S+)\s*", line.lower())
+            if ( mod ) :
+                self.type = 2
+                self.name = mod.group(1)
+                break
+        file.close()
+    
+    def __str__( self ) :
+        if ( self.type == 1 ) :
+            return self.source + ': program ' + self.name
+        else :
+            return self.source + ': module ' + self.name
+
+    def mod_required( self, skip ):
+        modules = []
+        file = open( self.source, 'r' )
+        for line in file :
+            req = re.match( "\s*use (\S+)\s*", line.lower()) 
+            if ( req ) :
+                # The same module may be included inside several subroutines; this
+                # insures it only shows once in the dependency list
+                if (( req.group(1) not in modules ) and (req.group(1) not in skip)):
+                    modules.append( req.group(1) )
+        return modules
+
+#------------------------------------------------------------------------------------------------
+# Find all used modules by a given source file
+#------------------------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------------------------
+# Generate an object filename from a source filename
+#------------------------------------------------------------------------------------------------
+
+def object_file( fname ) :
+    base = re.match("(.+)f(90|03)", fname)
+    return base.group(1)+'o'
+
+#------------------------------------------------------------------------------------------------
+# Recursively build the dependencies for a given file
+#------------------------------------------------------------------------------------------------
+
+# def build_depends( fname, depends, modSource ):
+#     
+#     # Store dependencies for current file
+#     source = SourceFile( fname )
+#     fdepends = source.mod_required()
+# 
+#     depends[ source.name ] = fdepends
+#     
+#     # Get dependencies of dependencies 
+#     for dep in fdepends :
+#         if ( modSource.has_key( dep ) ) :
+#             # Only build dependency if not done already
+#             if ( not depends.has_key( modSource[dep].name ) ) :
+#                 build_depends( modSource[dep].source, depends, modSource )
+
+def build_depends( fname, depends, modSource, skipMods, endMods ):
+    
+    # Store dependencies for current file
+    source = SourceFile( fname )
+    if ( source.name in endMods ) :
+        return
+    
+    fdepends = source.mod_required( skipMods ) 
+    depends[ source.name ] = fdepends
+    
+    # Get dependencies of dependencies 
+    for dep in fdepends :
+        if ( modSource.has_key( dep ) ) :
+            # Only build dependency if not done already
+            if ( not depends.has_key( modSource[dep].name ) ) :
+                build_depends( modSource[dep].source, depends, modSource, skipMods, endMods )
+    
+
+#################################################################################################
+# Main Script
+#################################################################################################
+
+# Parse command line options
+
+parser = OptionParser(usage = "usage: %prog [options] main-source-file.f90" )
+#parser.add_option( "-t", "--type", dest="depType", default = "obj-only", \
+#                     help = "Type of dependency to generate: 'obj-only', 'obj-dep' or 'mod-dep'" )
+
+(options, args) = parser.parse_args()
+
+#if ( not options.depType in ('obj-only','obj-dep','mod-dep') ):
+#    parser.error('Invalid value for type, must be one of "obj-only", "obj-dep" or "mod-dep"')
+
+if ( len(args) != 1 ):
+    parser.error('No source file supplied')
+    
+baseFile = args[0]
+
+if ( not os.path.isfile(baseFile) ):
+    parser.error('File not found : '+baseFile)
+
+sourceDir = os.path.dirname( baseFile )
+if ( sourceDir == '' ):
+    sourceDir = '.'
+
+#################################################################################################
+    
+# Get list of source files
+
+# Old version - all source files in the same directory
+#sourceFiles = [ SourceFile( fname ) for fname in glob.glob( sourceDir+'/*.f90' ) ]
+
+# New version - recursively find source files
+sourceFiles = []
+
+for root, dirs, files in os.walk( sourceDir ):
+    for name in files:
+        fileName = os.path.join(root, name)
+        if re.match("(.+)f(90|03)", fileName ):
+            sourceFiles.append( SourceFile( fileName )  )
+
+# Build a dictionary of modules -> sourcefile and check for ambiguities
+modSource = dict()
+for source in sourceFiles :
+    if ( source.type == 2 ) :
+        if ( modSource.has_key( source.name ) ) :
+            print >> sys.stderr, 'There is an ambiguity in module defintion.'
+            print >> sys.stderr, 'the module %s is defined in the following files:'%source.name
+            print >> sys.stderr, modules[mod].filename, ' and', source.filename
+            sys.exit('aborting...')
+        else :
+            modSource[ source.name ] = source
+
+
+# Recursively build dependency list
+
+#skipMods = ('m_system','m_parameters', 'm_file_system', 'm_utilities', 'm_restart',
+#            'm_node_conf', 'm_logprof', 'm_math', 'hdf5_util', 'stringutil', 
+#            'm_diagnostic_utilities', 'm_space', 'm_grid', 
+#            'm_vdf', 'm_vdf_define','m_vdf_math', 'm_vdf_comm', 'm_vdf_smooth')
+
+
+skipMods = ('m_system','m_parameters', 'm_file_system', 'm_utilities', 'm_restart',
+            'm_node_conf', 'm_logprof', 'm_math', 'hdf5_util', 'stringutil', 
+            'm_diagnostic_utilities', 'm_space', 'm_grid', 'm_vdf', 
+            'm_fparser', 'm_random')
+
+
+skipMods = []
+
+#endMods = ['m_emf']
+endMods = []
+
+depends = dict()
+build_depends( baseFile, depends, modSource, skipMods, endMods )
+
+
+print 'digraph G {'
+
+print '\tratio = 0.5;'
+print '\tsize="20,10";'
+print '\trankdir=LR;'
+print '\tconcentrate=true;'
+print '\tnode[fontsize = 120];'
+print '\tnode[fontname = "Klavika"];'
+
+usedNodes = []
+
+for dep in depends.keys() :
+    if ( not dep in usedNodes ) : usedNodes.append(dep)
+    for mod in depends[dep] :
+        if ( modSource.has_key(mod) ) :
+            print '\t %s -> %s [penwidth = 3];' % (dep,mod)
+            if ( not mod in usedNodes ) : usedNodes.append(mod)
+            
+for node in usedNodes :
+    
+    if ( modSource.has_key( node ) ) :
+        source =  os.path.basename(modSource[ node ].source)
+    else :
+        source =  os.path.basename(baseFile)
+    
+    print """ %s [ shape = none, margin = 0, label = <
+<table border="5" cellborder="1" cellspacing="1">
+  <tr> <td bgcolor="firebrick"><font color="white">%s</font> </td> </tr>
+  <tr> <td>%s</td> </tr>
+</table>
+>] 
+    """ % ( node, node, source )
+
+print '}'
+
+
+# end

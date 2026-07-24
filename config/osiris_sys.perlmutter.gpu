@@ -1,0 +1,143 @@
+##########################################################################################
+# System specific configuration for PERLMUTTER GPU @ NERSC
+#   System:    Cray
+#   Compilers: GNU family ( gcc, gfortran ), Nvidia (nvcc)
+#   MPI:       Cray MPICH
+
+# See:
+# https://docs.nersc.gov/tutorials/playbooks/compiling/
+
+# Recommended module commands:
+#   module unload darshan
+#   module load PrgEnv-gnu
+#   module load cudatoolkit
+#   module load cray-hdf5-parallel
+#   module load cray-fftw
+##########################################################################################
+
+##########################################################################################
+# OSIRIS configuration
+
+DISABLE_PGC = 1
+# DISABLE_TILES = 1
+DISABLE_QED = 1
+DISABLE_QEDCYL = 1
+DISABLE_SHEAR = 1
+DISABLE_RAD = 1
+DISABLE_XXFEL = 1
+DISABLE_NEUTRAL_SPIN = 1
+DISABLE_GR = 1
+DISABLE_CYLMODES = 1
+DISABLE_OVERDENSE = 1
+DISABLE_OVERDENSE_CYL = 1
+ENABLE_CUDA = 1
+
+# Numeric precision
+#PRECISION = SINGLE
+PRECISION = DOUBLE
+
+# Fortran preprocessor
+FPP = gcc -C -E -x assembler-with-cpp
+
+SIMD = AVX2
+SIMD_FLAGS = -march=core-avx2
+
+F90 = ftn
+F03 = ftn
+cc  = cc
+cxx = CC
+NVCC = nvcc -arch=sm_80
+
+DISABLE_PARANOIA = 1
+
+##########################################################################################
+# Fortran flags
+
+# External name mangling
+UNDERSCORE = FORTRANSINGLEUNDERSCORE
+
+F90FLAGS_all = -pipe -ffree-line-length-none -fno-range-check -cpp \
+               -fallow-argument-mismatch
+
+# Enable OpenMP code
+FPP += -D_OPENMP
+F90FLAGS_all += --openmp
+
+# ------------------------------- Compilation Targets ------------------------------------
+
+#debug
+F90FLAGS_debug      = $(F90FLAGS_all) -g -Og -fbacktrace -fbounds-check -Wall \
+                      -fimplicit-none -Wimplicit-interface -Wconversion  -Wsurprising \
+                      -Wunderflow -ffpe-trap=invalid,zero,overflow
+
+# Production
+F90FLAGS_production = $(F90FLAGS_all) -Ofast -finline-functions
+
+# Profile with VTune
+F90FLAGS_profile    = $(F90FLAGS_all) $(F90FLAGS_production) -g
+
+##########################################################################################
+# C flags
+
+#debug
+CFLAGS_debug      = -std=c99 -Og -g -Wall -pedantic -march=native
+
+# production
+CFLAGS_production = -std=c99 -Ofast -Wno-uninitialized -finline-functions -march=native
+
+# profile
+CFLAGS_profile    = $(CFLAGS_production) -g
+
+##########################################################################################
+# NVCC flags
+
+NVCCFLAGS_all = -std=c++11 -dc
+
+#debug
+NVCCFLAGS_debug      = $(NVCCFLAGS_all) -O0 -G -g
+
+# production
+# NVCCFLAGS_production = $(NVCCFLAGS_all) -O3 -dlto -use_fast_math -extra-device-vectorization
+NVCCFLAGS_production = $(NVCCFLAGS_all) -O3 -dlto -use_fast_math -extra-device-vectorization --maxrregcount 64
+
+# profile
+NVCCFLAGS_profile    = $(NVCCFLAGS_production) --generate-line-info
+
+# for additional compilation information, add the following options to NVCCFLAGS_debug
+# -opt-info inline -res-usage --ptxas-options="-v"
+
+# note, you must also add -res-usage to CUDA_CLINKFLAGS_debug below if specified above
+
+# you can also add --nvlink-options="-v" to CUDA_CLINKFLAGS_debug
+
+##########################################################################################
+# Linker flags
+
+# None required
+LDFLAGS = -lstdc++
+
+##########################################################################################
+# Libraries
+
+# MPI
+# MPI is supported through wrapper compilers, no flags required
+
+# MPI supports MPI_IN_PLACE reduction
+FPP += -D__HAS_MPI_IN_PLACE__
+
+# HDF5
+# This requires loading the hdf5-parallel module
+H5_ROOT = $(HDF5_ROOT)
+H5_FCOMPILEFLAGS = -I$(H5_ROOT)/include
+H5_FLINKFLAGS    = -L$(H5_ROOT)/lib -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 \
+                   -lz -ldl -lm -Wl,-rpath -Wl,$(H5_ROOT)/lib
+H5_HAVE_PARALLEL = 1
+
+# CUDA
+CUDA_ROOT = /opt/nvidia/hpc_sdk/Linux_x86_64/21.9/cuda/11.4
+CUDA_CLINKFLAGS_debug = -dlink
+CUDA_CLINKFLAGS_production = -dlink -dlto
+CUDA_CLINKFLAGS_profile = $(CUDA_CLINKFLAGS_production)
+CUDA_FLINKFLAGS = -L$(CUDA_ROOT)/lib64 -lcudart -lcuda -lcurand -dlto
+
+# FFTW_INSTALL_DIR = $(FFTW_ROOT)

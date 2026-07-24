@@ -1,0 +1,169 @@
+!--------simulation mode--------
+simulation
+{
+	algorithm = 'cuda',
+}
+
+!--------the node configuration for this simulation--------
+node_conf
+{
+  node_number(1:2) = 2, 1,
+  if_periodic(1:2) = .true.,.true.,
+  n_threads = 1,
+  tile_number(1:2) = 32,32,
+  tile_topology = 'snake',
+  chunk_size = 64,
+  chunk_pool_size = 10000,
+  nchunks_pad = 2,
+}
+
+
+!----------spatial grid----------
+grid
+{
+	nx_p(1:2) =  256, 256,
+	coordinates = "cartesian",
+	load_balance(1:2) = .true., .true.,
+	lb_type = "dynamic",
+	n_dynamic = 10,
+	! ndump_node_load = 10,
+	! cell_weight = 1.0,
+}
+
+
+!----------time step and global data dump timestep number----------
+time_step
+{
+	dt     =   0.27e0,
+	ndump  =   10,
+}
+
+restart
+{
+	ndump_fac = 0,
+	if_restart=.false.,
+	!if_remold=.true.,
+}
+
+
+!----------spatial limits of the simulations----------
+!(note that this includes information about
+		! the motion of the simulation box)
+space
+{
+	xmin(1:2) = 0.000e0, 0.000e0,
+	xmax(1:2) = 100.0e0, 100.0e0,
+	if_move(1:2) = .false., .false.,
+}
+
+
+!----------time limits ----------
+time
+{
+	tmin = 0.0e0, tmax  = 27.0e0,
+}
+
+!----------field solver set up-----------------
+el_mag_fld
+{
+}
+
+!----------boundary conditions for em-fields ----------
+emf_bound
+{
+}
+
+diag_emf
+{
+	ndump_fac = 0,
+	ndump_fac_ene_int = 0,
+	ndump_fac_lineout = 0,
+	reports = "e1", "b1",
+}
+
+
+!----------number of particle species----------
+particles
+{
+	num_species = 1,
+	!interpolation = "linear",
+	interpolation = "quadratic",
+	!interpolation = "cubic",
+	!interpolation = "quartic",
+
+	!ndump_fac = 0,
+	!reports = "charge", "dcharge_dt",
+}
+
+
+
+!----------information for ELECTRONS----------
+species
+{
+	name = "electrons",
+	num_par_max = 700000,
+	rqm = -1.0d0,
+	num_par_x(1:2) = 2,2,
+	! push_type = "standard",
+	n_sort = 0,
+	free_stream=.true.,
+}
+
+udist
+{
+	uth(1:3) = 0.00d0, 0.00d0, 0.00d0,
+	ufl(1:3) = 500.0d0, 500.0d0, 0.0d0,
+}
+
+profile
+{
+	profile_type = "math func",
+	math_func_expr = "if((x1-10)^2+(x2-50)^2<6.4^2,
+                       if( (1.5*abs(x2-50) < x1-9),0.,if((x1-10)^2+(x2-54)^2<1,0.,100.)),
+                      0.0)+if((x1-35)^2+(x2-50)^2<6.4^2,
+                       if( (1.5*abs(x2-50) < x1-34),0.,if((x1-35)^2+(x2-54)^2<1,0.,100.)),
+                      0.0)+if((x1-75)^2+(x2-50)^2<20^2,
+                       if( (1.5*abs(x2-50) < x1-74),0.,if((x1-77)^2+(x2-62)^2<3^2,0.,10.)),
+                      0.0)",
+	den_min = .00001,
+}
+
+
+!----------boundary conditions for this species----------
+spe_bound
+{
+}
+
+diag_species
+{
+	ndump_fac_ene = 0,
+	ndump_fac_pha = 1,
+	!ndump_fac_raw = 0,
+	ndump_fac = 1,
+
+	reports = "charge",
+
+	ps_xmin(1:2) = 0.0, 0.0,     ps_pmin(1:3) =  -1.0, -1.0, -1.0,
+	ps_xmax(1:2) = 100.0, 100.0, ps_pmax(1:3) =   1.0,  1.0,  1.0,
+	ps_nx(1:2)   = 128, 128,     ps_np(1:3)   =   100, 100, 100,
+
+	if_ps_p_auto(1:3) = .true., .true., .false.,
+
+	!phasespaces = "p1x1", "p2x2", "p3x1", "p3x2",
+    !                  "p1p2", "p1p3", "p2p3", "p1p2p3","x1x2",
+	              !"x2p1p2",
+	phasespaces = "p1x1", "p1p2",
+}
+
+!----------SMOOTHING FOR CURRENTS------------------------------------------------------------
+smooth
+{
+	type = 'none',
+}
+
+
+diag_current
+{
+	ndump_fac = 0,
+	reports = "j1", "j2", "j3",
+}

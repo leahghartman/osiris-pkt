@@ -1,0 +1,148 @@
+! -------------------------------------------------------------------------
+simulation
+{
+  algorithm = "exact-ext-emf",
+}
+
+!----------the node configuration for this simulation---------
+node_conf
+{
+  node_number(1:2) = 1, 1,
+  if_periodic(1:2) = .false., .false.,
+}
+
+!----------spatial grid----------
+grid
+{
+  nx_p(1:2) = 32,  64,
+  coordinates = "cartesian",
+}
+
+!----------time step and global data dump timestep number----------
+time_step
+{
+  dt  = 0.0625,
+  ndump  =  10, !  1
+}
+
+!----------restart information----------
+restart
+{
+  ndump_fac = 0,
+  if_restart = .false.,
+  if_remold = .true.,
+}
+
+!----------spatial limits of the simulations----------
+!(note that this includes information about
+! the motion of the simulation box)
+space
+{
+  xmin(1:2) = -8.0,  -4,
+  xmax(1:2) = -4.0,  4,
+  if_move =    .false.,   .false.,
+}
+
+
+!----------time limits ----------
+time
+{
+  tmin = 0.0,
+  tmax = 1500.0,
+}
+
+el_mag_fld
+{
+  ext_fld = "dynamic",
+  type_ext_e(2) = "math func",
+  type_ext_b(3) = "math func",
+  ext_e_mfunc(2) = "if( x1+0.999953240028102*t+10>0, if( x1+0.999953240028102*t>0, if( x1+0.999953240028102*t>1.256637061435917d3, 1.260005363503915*(1.256637061435917d3-x1-0.999953240028102*t)*exp(-(1.256637061435917d3-x1-0.999953240028102*t)^2/2), -1.260005363503915*sin(x1+0.999953240028102*t)), -1.260005363503915*(x1+0.999953240028102*t)*exp(-(x1+0.999953240028102*t)^2/2)), 0.0)",
+  ext_b_mfunc(3) = "if( x1+0.999953240028102*t+10>0, if( x1+0.999953240028102*t>0, if( x1+0.999953240028102*t>1.256637061435917d3, -1.260064284074428*(1.256637061435917d3-x1-0.999953240028102*t)*exp(-(1.256637061435917d3-x1-0.999953240028102*t)^2/2), 1.260064284074428*sin(x1+0.999953240028102*t)), 1.260064284074428*(x1+0.999953240028102*t)*exp(-(x1+0.999953240028102*t)^2/2)), 0.0)",
+}
+
+
+!----------boundary conditions for em-fields ----------
+emf_bound
+{
+  type(1:2,1) = "open", "open",
+  type(1:2,2) = "open", "open",
+}
+
+!----------diagnostic for electromagnetic fields----------
+diag_emf
+{
+}
+
+!----------number of particle species----------
+particles
+{
+  interpolation =  "quadratic",
+  num_species = 1,
+}
+
+!----------configuration of the bunch----------
+species
+{
+  name = "beam",
+  num_par_max = 7000000,
+  rqm=-1.0,
+  num_par_x(1:2) =  1, 1,
+  push_type = "standard",
+
+  init_fields = .false.,
+  free_stream = .false.,
+  add_tag = .true.,
+}
+
+udist
+{
+  uth(1:3) = 0.0, 0.0 , 0.0,
+  ufl(1:3) = 0.296376941291200, 0.0 , 0.0,
+  use_classical_uadd = .true.,
+}
+
+profile
+{
+  density = 9.545716985572910d-09, !
+  profile_type(1:2) =   "gaussian", "gaussian",
+  gauss_center(1:2) =  -7.0,   0.0,
+  gauss_sigma(1:2)  =   1.0,   2.0,
+  gauss_range(1:2,1) =  -7.1, -7.0,
+  gauss_range(1:2,2)=  -0.1,  0.,
+}
+
+spe_bound
+{
+  type(1:2,1) = "open", "open",
+  type(1:2,2) = "absorbing", "absorbing",
+}
+
+diag_species
+{
+}
+
+
+zpulse
+{
+  a0 = 0,
+  omega0 = 1.0,
+  pol_type = 1,
+  pol = 0.0,
+
+  propagation = "forward",
+  lon_type = "polynomial",
+  lon_start = 0.0,
+  lon_rise = 0.0,
+  lon_fall = 0.0,
+  lon_flat = 25.132741228718345,
+  per_type = "gaussian",
+  per_w0 = 13.2,
+  per_focus = 0.0,
+}
+
+smooth
+{
+  type(1:2) = "5pass", "none",
+}
+
+! --------------------- end of osiris input file ---------------

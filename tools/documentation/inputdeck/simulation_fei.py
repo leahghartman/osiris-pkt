@@ -1,0 +1,155 @@
+
+namelist_details = {
+
+####################################################################
+#           Defintions for nl_sp_filter
+####################################################################
+ '/m_current_fei/read_input_fei/nl_sp_filter': {
+ 'Label':
+"""
+""",
+ 'detail-page-template':  'standard',
+ 'summary-text':
+"""
+""",
+ 'detail-page-header':
+"""
+""",
+ 'detail-page-footer':
+"""
+""",
+ 'items': [
+    ('filter_limit',
+"""
+"""),
+    ('filter_width',
+"""
+"""),
+    ('correct_current',
+"""
+"""),
+    ('filter_current',
+"""
+"""),
+    ('n_damp_cell',
+"""
+"""),
+ ]
+ },
+####################################################################
+#           Defintions for nl_el_mag_fld
+####################################################################
+ '/m_emf_fei/read_input_fei/nl_el_mag_fld': {
+ 'Label':
+"""
+""",
+ 'detail-page-template':  'standard',
+ 'summary-text':
+"""
+""",
+ 'detail-page-header':
+"""
+""",
+ 'detail-page-footer':
+"""
+""",
+ 'items': [
+    ('solver',
+"""
+"""),
+    ('n_coef',
+"""
+"""),
+    ('coef',
+"""
+"""),
+    ('solver_ord',
+"""
+"""),
+    ('kl',
+"""
+"""),
+    ('ku',
+"""
+"""),
+    ('dk',
+"""
+"""),
+    ('smooth_type',
+"""
+"""),
+    ('smooth_niter',
+"""
+"""),
+    ('smooth_nmax',
+"""
+"""),
+    ('init_dipole_b_m',
+"""
+"""),
+    ('init_dipole_b_x0',
+"""
+"""),
+    ('init_dipole_b_r0',
+"""
+"""),
+    ('init_dipole_e_p',
+"""
+"""),
+    ('init_dipole_e_x0',
+"""
+"""),
+    ('init_dipole_e_r0',
+"""
+"""),
+    ('ext_fld',
+"""
+"""),
+    ('type_ext_b',
+"""
+"""),
+    ('type_ext_e',
+"""
+"""),
+    ('ext_b0',
+"""
+"""),
+    ('ext_e0',
+"""
+"""),
+    ('ext_b_mfunc',
+"""
+"""),
+    ('ext_e_mfunc',
+"""
+"""),
+    ('ext_dipole_b_m',
+"""
+"""),
+    ('ext_dipole_b_x0',
+"""
+"""),
+    ('ext_dipole_b_r0',
+"""
+"""),
+    ('ext_dipole_e_p',
+"""
+"""),
+    ('ext_dipole_e_x0',
+"""
+"""),
+    ('ext_dipole_e_r0',
+"""
+"""),
+    ('n_subcycle',
+"""
+"""),
+    ('marder_d',
+"""
+"""),
+    ('marder_n',
+"""
+"""),
+ ]
+ },
+}

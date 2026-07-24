@@ -1,0 +1,730 @@
+namelist_details = {
+
+####################################################################
+#           Defintions for nl_zpulse
+####################################################################
+ '/m_zpulse_std/read_input_zpulse/nl_zpulse': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('if_launch',
+""" 
+"""),
+    ('b_type',
+""" 
+"""),
+    ('a0',
+""" 
+"""),
+    ('omega0',
+""" 
+"""),
+    ('phase',
+""" 
+"""),
+    ('pol_type',
+""" 
+"""),
+    ('pol',
+""" 
+"""),
+    ('propagation',
+""" 
+"""),
+    ('direction',
+""" 
+"""),
+    ('chirp_order',
+""" 
+"""),
+    ('chirp_coefs',
+""" 
+"""),
+    ('lon_fwhm',
+""" 
+"""),
+    ('lon_type',
+""" 
+"""),
+    ('lon_start',
+""" 
+"""),
+    ('lon_rise',
+""" 
+"""),
+    ('lon_flat',
+""" 
+"""),
+    ('lon_fall',
+""" 
+"""),
+    ('lon_duration',
+""" 
+"""),
+    ('lon_x0',
+""" 
+"""),
+    ('lon_range',
+""" 
+"""),
+    ('lon_math_func',
+""" 
+"""),
+    ('lon_tilt',
+""" 
+"""),
+    ('per_type',
+""" 
+"""),
+    ('per_center',
+""" 
+"""),
+    ('per_w0',
+""" 
+"""),
+    ('per_fwhm',
+""" 
+"""),
+    ('per_focus',
+""" 
+"""),
+    ('per_chirp_order',
+""" 
+"""),
+    ('per_chirp_coefs',
+""" 
+"""),
+    ('per_w0_asym',
+""" 
+"""),
+    ('per_fwhm_asym',
+""" 
+"""),
+    ('per_focus_asym',
+""" 
+"""),
+    ('per_asym_trans',
+""" 
+"""),
+    ('per_n',
+""" 
+"""),
+    ('per_0clip',
+""" 
+"""),
+    ('per_kt',
+""" 
+"""),
+    ('launch_time',
+""" 
+"""),
+    ('no_div_corr',
+""" 
+"""),
+    ('per_tem_mode',
+""" 
+"""),
+ ]
+ },
+
+
+####################################################################
+#           Defintions for nl_zpulse_mov_wall
+####################################################################
+ '/m_zpulse_mov_wall/read_input_zpulse_mov_wall/nl_zpulse_mov_wall': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('a0',
+""" 
+"""),
+    ('omega0',
+""" 
+"""),
+    ('phase',
+""" 
+"""),
+    ('pol_type',
+""" 
+"""),
+    ('pol',
+""" 
+"""),
+    ('chirp_order',
+""" 
+"""),
+    ('chirp_coefs',
+""" 
+"""),
+    ('tenv_fwhm',
+""" 
+"""),
+    ('tenv_type',
+""" 
+"""),
+    ('tenv_rise',
+""" 
+"""),
+    ('tenv_flat',
+""" 
+"""),
+    ('tenv_fall',
+""" 
+"""),
+    ('tenv_duration',
+""" 
+"""),
+    ('tenv_range',
+""" 
+"""),
+    ('tenv_math_func',
+""" 
+"""),
+    ('tenv_tilt',
+""" 
+"""),
+    ('per_type',
+""" 
+"""),
+    ('per_center',
+""" 
+"""),
+    ('per_w0',
+""" 
+"""),
+    ('per_fwhm',
+""" 
+"""),
+    ('per_focus',
+""" 
+"""),
+    ('per_chirp_order',
+""" 
+"""),
+    ('per_chirp_coefs',
+""" 
+"""),
+    ('per_w0_asym',
+""" 
+"""),
+    ('per_fwhm_asym',
+""" 
+"""),
+    ('per_focus_asym',
+""" 
+"""),
+    ('per_asym_trans',
+""" 
+"""),
+    ('per_n',
+""" 
+"""),
+    ('per_0clip',
+""" 
+"""),
+    ('per_kt',
+""" 
+"""),
+    ('per_tem_mode',
+""" 
+"""),
+    ('launch_time',
+""" 
+"""),
+    ('if_launch',
+""" 
+"""),
+    ('wall_pos',
+""" 
+"""),
+    ('wall_vel',
+""" 
+"""),
+ ]
+ },
+####################################################################
+#           Defintions for nl_zpulse_point
+####################################################################
+ '/m_zpulse_point/read_input_zpulse_point/nl_zpulse_point': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('if_launch',
+""" 
+"""),
+    ('a0',
+""" 
+"""),
+    ('omega0',
+""" 
+"""),
+    ('phase',
+""" 
+"""),
+    ('pol_vector',
+""" 
+"""),
+    ('chirp_order',
+""" 
+"""),
+    ('chirp_coefs',
+""" 
+"""),
+    ('tenv_type',
+""" 
+"""),
+    ('tenv_fwhm',
+""" 
+"""),
+    ('tenv_rise',
+""" 
+"""),
+    ('tenv_flat',
+""" 
+"""),
+    ('tenv_fall',
+""" 
+"""),
+    ('tenv_duration',
+""" 
+"""),
+    ('tenv_range',
+""" 
+"""),
+    ('tenv_math_func',
+""" 
+"""),
+    ('launch_time',
+""" 
+"""),
+    ('point_pos',
+""" 
+"""),
+ ]
+ },
+####################################################################
+#           Defintions for nl_zpulse_sliding_focus
+####################################################################
+ '/m_zpulse_sliding_focus/read_input_zpulse_sliding_focus/nl_zpulse_sliding_focus': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('a0',
+""" 
+"""),
+    ('omega0',
+""" 
+"""),
+    ('phase',
+""" 
+"""),
+    ('pol_type',
+""" 
+"""),
+    ('pol',
+""" 
+"""),
+    ('propagation',
+""" 
+"""),
+    ('direction',
+""" 
+"""),
+    ('chirp_order',
+""" 
+"""),
+    ('chirp_coefs',
+""" 
+"""),
+    ('tenv_fwhm',
+""" 
+"""),
+    ('tenv_type',
+""" 
+"""),
+    ('tenv_rise',
+""" 
+"""),
+    ('tenv_flat',
+""" 
+"""),
+    ('tenv_fall',
+""" 
+"""),
+    ('tenv_duration',
+""" 
+"""),
+    ('tenv_range',
+""" 
+"""),
+    ('tenv_math_func',
+""" 
+"""),
+    ('tenv_tilt',
+""" 
+"""),
+    ('per_type',
+""" 
+"""),
+    ('per_center',
+""" 
+"""),
+    ('per_w0',
+""" 
+"""),
+    ('per_fwhm',
+""" 
+"""),
+    ('per_focus',
+""" 
+"""),
+    ('per_chirp_order',
+""" 
+"""),
+    ('per_chirp_coefs',
+""" 
+"""),
+    ('per_w0_asym',
+""" 
+"""),
+    ('per_fwhm_asym',
+""" 
+"""),
+    ('per_focus_asym',
+""" 
+"""),
+    ('per_asym_trans',
+""" 
+"""),
+    ('per_n',
+""" 
+"""),
+    ('per_0clip',
+""" 
+"""),
+    ('per_kt',
+""" 
+"""),
+    ('per_tem_mode',
+""" 
+"""),
+    ('launch_time',
+""" 
+"""),
+    ('if_launch',
+""" 
+"""),
+ ]
+ },
+####################################################################
+#           Defintions for nl_zpulse_speckle
+####################################################################
+ '/m_zpulse_speckle/read_input_zpulse_speckle/nl_zpulse_speckle': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('a0',
+""" 
+"""),
+    ('omega0',
+""" 
+"""),
+    ('phase',
+""" 
+"""),
+    ('pol_type',
+""" 
+"""),
+    ('pol',
+""" 
+"""),
+    ('propagation',
+""" 
+"""),
+    ('direction',
+""" 
+"""),
+    ('speckle_type',
+""" 
+"""),
+    ('laser_bandwidth',
+""" 
+"""),
+    ('recurrence_time',
+""" 
+"""),
+    ('duty_cycle',
+""" 
+"""),
+    ('stud_duration',
+""" 
+"""),
+    ('stud_jitter',
+""" 
+"""),
+    ('n_speckle',
+""" 
+"""),
+    ('bandwidth_type',
+""" 
+"""),
+    ('color_cycle',
+""" 
+"""),
+    ('nfm',
+""" 
+"""),
+    ('fm',
+""" 
+"""),
+    ('phasemod_amplitude',
+""" 
+"""),
+    ('dt_update_speckle',
+""" 
+"""),
+    ('if_dump_speckle',
+""" 
+"""),
+    ('rseed_phase',
+""" 
+"""),
+    ('rseed_stud',
+""" 
+"""),
+    ('dt_update_pol',
+""" 
+"""),
+    ('pol_stepping',
+""" 
+"""),
+    ('chirp_order',
+""" 
+"""),
+    ('chirp_coefs',
+""" 
+"""),
+    ('chirp_period',
+""" 
+"""),
+    ('tenv_fwhm',
+""" 
+"""),
+    ('tenv_type',
+""" 
+"""),
+    ('tenv_rise',
+""" 
+"""),
+    ('tenv_flat',
+""" 
+"""),
+    ('tenv_fall',
+""" 
+"""),
+    ('lon_focus',
+""" 
+"""),
+    ('tenv_duration',
+""" 
+"""),
+    ('tenv_range',
+""" 
+"""),
+    ('tenv_math_func',
+""" 
+"""),
+    ('spatial_tilt',
+""" 
+"""),
+    ('launch_time',
+""" 
+"""),
+    ('if_launch',
+""" 
+"""),
+ ]
+ },
+####################################################################
+#           Defintions for nl_zpulse_wall
+####################################################################
+ '/m_zpulse_wall/read_input_zpulse_wall/nl_zpulse_wall': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('a0',
+""" 
+"""),
+    ('omega0',
+""" 
+"""),
+    ('phase',
+""" 
+"""),
+    ('pol_type',
+""" 
+"""),
+    ('pol',
+""" 
+"""),
+    ('propagation',
+""" 
+"""),
+    ('direction',
+""" 
+"""),
+    ('chirp_order',
+""" 
+"""),
+    ('chirp_coefs',
+""" 
+"""),
+    ('tenv_fwhm',
+""" 
+"""),
+    ('tenv_type',
+""" 
+"""),
+    ('tenv_rise',
+""" 
+"""),
+    ('tenv_flat',
+""" 
+"""),
+    ('tenv_fall',
+""" 
+"""),
+    ('tenv_duration',
+""" 
+"""),
+    ('tenv_range',
+""" 
+"""),
+    ('tenv_math_func',
+""" 
+"""),
+    ('tenv_tilt',
+""" 
+"""),
+    ('per_type',
+""" 
+"""),
+    ('per_center',
+""" 
+"""),
+    ('per_w0',
+""" 
+"""),
+    ('per_fwhm',
+""" 
+"""),
+    ('per_focus',
+""" 
+"""),
+    ('per_chirp_order',
+""" 
+"""),
+    ('per_chirp_coefs',
+""" 
+"""),
+    ('per_w0_asym',
+""" 
+"""),
+    ('per_fwhm_asym',
+""" 
+"""),
+    ('per_focus_asym',
+""" 
+"""),
+    ('per_asym_trans',
+""" 
+"""),
+    ('per_n',
+""" 
+"""),
+    ('per_0clip',
+""" 
+"""),
+    ('per_kt',
+""" 
+"""),
+    ('per_tem_mode',
+""" 
+"""),
+    ('launch_time',
+""" 
+"""),
+    ('if_launch',
+""" 
+"""),
+ ]
+ },
+
+
+}

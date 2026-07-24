@@ -1,0 +1,139 @@
+##########################################################################################
+# System specific configuration for OSIRIS
+#   System:    Lumi
+#   Compilers: GNU family gcc       (aliased to cc),
+#   			  gfortran  (aliased to ftn)
+#
+#   add the following lines to your $HOME/.bashrc
+#
+#   	module load cray-hdf5
+#   	module load PrgEnv-gnu
+#	module load cray-python/3.9.13.1
+#
+##########################################################################################
+
+##########################################################################################
+# OSIRIS configuration
+
+DISABLE_PGC = True
+#DISABLE_CYLMODES = True
+DISABLE_SHEAR = True
+#DISABLE_RAD = True
+DISABLE_QED = True
+#DISABLE_FEI = True
+#DISABLE_TILES = True
+DISABLE_OVERDENSE = True
+DISABLE_GR = True
+
+# Set the following to a system optimized timer, or leave commented to use a default one
+TIMER = __POSIX_TIMER__
+
+# SIMD
+# Uncomment one of the following lines to enable SSE / AVX optimized code
+#SIMD = SSE
+SIMD = AVX
+
+# Numeric precision (SINGLE|DOUBLE)
+#PRECISION = SINGLE
+PRECISION = DOUBLE
+
+##########################################################################################
+# Compilers
+
+F90 = ftn -mavx
+F03 = $(F90) -std=gnu
+cc  = cc -Wa,-q
+
+# Fortran preprocessor
+FPP = cc -C -nostdinc -E -x assembler-with-cpp -D__HAS_MPI_IN_PLACE__
+
+
+F90FLAGS_all = -pipe -ffree-line-length-none -fno-range-check -fallow-argument-mismatch
+
+# This flag supresses some hyper-vigilant compilier warnings that have been deemed harmless. The list of warnings
+# can be found is ./source/config.mk.warnings. If you are having some strange issues that you need to debug
+# comment out DISABLE_PARANOIA and/or read the ./source/config.warnings file to allow the warnings if you think
+# they may help you find the issue.
+DISABLE_PARANOIA = YES
+
+##########################################################################################
+# Fortran flags
+
+# External name mangling
+UNDERSCORE = FORTRANSINGLEUNDERSCORE
+
+# Flag to enable compilation of .f03 files (so far only intel compiler requires this)
+F03_EXTENSION_FLAG = -free
+
+# Enable OpenMP code
+#FPP += -D_OPENMP
+#F90FLAGS_all += -openmp
+
+# ------------------------------- Compilation Targets ------------------------------------
+
+# Debug
+
+# -fpe-all:0
+
+F90FLAGS_debug      = $(F90FLAGS_all) -O0 -debug all -traceback -check all,noarg_temp_created \
+                      -warn all -fpe-all=0 -ftrapuv
+
+# Production
+F90FLAGS_production = $(F90FLAGS_all) -Ofast -march=native
+
+# Profile Shark
+# you cannot source profile with -ipo -static (which are turned on by -fast)
+# After compilation you must generate the symbol table manually (the system gets confused
+# because of the extra preprocessor, the C code does not require this)
+# go to the directory where the binary is located and run:
+# % dsymutil <binary-name>
+
+F90FLAGS_profile    = $(F90FLAGS_all) -O3 -xHost -debug all
+
+##########################################################################################
+# C flags
+
+# -wd,981,1418,2259 \
+#debug
+CFLAGS_debug = -O0 -g -debug full -traceback -fp-trap-all=common -Wall -w3 -wd,981,1418,2259\
+               -pedantic -std=c99
+
+# profile
+CFLAGS_profile = -O3 -xHost -std=c99 -debug all
+
+# production
+# CFLAGS_production = -fast
+CFLAGS_production = -Ofast -march=native -std=c99
+
+##########################################################################################
+# Linker flags
+
+# None required
+#LDFLAGS =
+
+##########################################################################################
+# Libraries
+
+# FFTW
+#FFTW_INSTALL_DIR = $(FFTW_DIR)
+FFTW_ROOT = /opt/cray/pe/fftw/3.3.10.1/x86_rome
+FFTW_FCOMPILEFLAGS = -I$(FFTW_ROOT)/include
+# flags for double precision
+FFTW_FLINKFLAGS = -L$(FFTW_ROOT)/lib -lfftw3
+
+# MPI
+# MPI is supported through wrapper compilers, no flags required
+
+# HDF5
+# HDF5 is supported through wrapper compilers, no flags required
+H5_ROOT = $(HDF5_ROOT)
+
+H5_FCOMPILEFLAGS = -I$(H5_ROOT)/include
+H5_FLINKFLAGS = -L$(H5_ROOT)/lib \
+-lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 \
+-lz -lrt -ldl -lm -Wl,-rpath -Wl,$(H5_ROOT)/lib
+
+#PYTHON
+CONDA_ROOT = /opt/cray/pe/python/3.9.13.1
+PY_FCOMPILEFLAGS = -I$(CONDA_ROOT)/include/python3.9
+PY_FLINKFLAGS = -L$(CONDA_ROOT)/lib -lpython3.9 -Wl,-rpath,$(CONDA_ROOT)/lib

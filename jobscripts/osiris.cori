@@ -1,0 +1,486 @@
+#!/usr/bin/env python
+
+#------------------------------------------------------------------------------------------------
+#
+# OSIRIS queue submission script
+#
+# This script automates the process of launching an OSIRIS job on queue based systems.
+#
+#
+#------------------------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------------------------
+# Job submission script for the CORI System
+#  - This system uses SLURM
+#  - The system has 2 different partitions cpu|knl
+#------------------------------------------------------------------------------------------------
+
+# Command used to submit jobs
+submitCmd = "sbatch"
+
+# Command used to check the queue
+qstatCmd  = "squeue -u"
+
+# Command to watch the queue (check the queue at 5s intervals)
+watchQueueCmd = "watch -c -n 5 sqs -u"
+
+#------------------------------------------------------------------------------------------------
+# Creates the job file
+#------------------------------------------------------------------------------------------------
+#
+# NN: number of nodes (max depending on the queue)
+# ncpus=CC:  number of physical cores per node
+# mpiprocs=TT:  number of MPI tasks per node
+#
+#------------------------------------------------------------------------------------------------
+
+# CPU partition example
+"""
+
+OSIRIS 2D input paramenters:
+* node_conf(1:2) = 8,8,
+* n_threads = 4
+
+Prepare submission job with following parameters
+* Hyperthreading:       2 threads/core
+* Queue:                regular
+* Job name:             osiris.test.job
+* Email address:        user@emal.server
+* Wallclock time:       6h30
+
+
+#!/bin/bash
+#SBATCH -N 2
+#SBATCH -C haswell
+#SBATCH -q regular
+#SBATCH -J osiris.test.job
+#SBATCH --mail-user=user@email.server
+#SBATCH --mail-type=ALL
+#SBATCH -t 06:30:00
+
+#OpenMP settings:
+export OMP_NUM_THREADS=4
+export OMP_PLACES=threads
+export OMP_PROC_BIND=spread
+
+
+#run the application:
+srun -n 16 -c 8 --cpu_bind=cores osiris.2D.cpu
+"""
+
+
+templateJob = \
+"""#!/bin/bash -l
+#SBATCH --nodes=${CORI_NODES}
+#SBATCH --time=${WALLTIME}
+#SBATCH --qos=${QUEUE}
+#SBATCH --constraint=${PARTITION}
+#SBATCH --job-name=${JOBNAME}
+#SBATCH --error=osiris.stderr
+#SBATCH --output=osiris.stdout
+#SBATCH --mail-user=${USER}@cori.nersc.gov
+#SBATCH --mail-type=ALL
+${CORE_SPEC}
+
+date
+
+export OMP_NUM_THREADS=${NTHREADS}
+export OMP_PLACES=threads
+export OMP_PROC_BIND=${OMP_PROC_BIND}
+
+srun -n ${NTASK} -c ${CORES_TASK} --cpu_bind=${CPU_BIND} ${MEM_BIND} ${BINARY} ${ARGS}
+
+date"""
+
+def job_file( binary, ntask, nthreads, options, jobName, inputFile ):
+
+    # Check number of threads
+
+    if ( options.partition == 'cpu'):
+        # Cori Haswell nodes have 2x Intel E5-2698 (16 cores)
+
+        if ( options.hyper == 1 ):
+            if ( not nt in [1,2,4,8,16]):
+                sys.exit('Invalid number of threads for the Cori Haswell partition,\n' +
+                    'must be one of [1,2,4,8,16]')
+        elif ( options.hyper == 2 ):
+            if ( not nt in [1,2,4,8,16,32]):
+                sys.exit('Invalid number of threads for the Cori Haswell partition,\n' +
+                    'must be one of [1,2,4,8,16,32]')
+        else:
+            sys.exit('Invalid hyperthreading parameter for the Cori Haswell partition, must be 1 or 2.')
+
+        # Number of logical cores per node
+        ncores_node = 2 * 16 * options.hyper
+
+        core_spec = ""
+        membind   = ""
+        partition = "haswell"
+
+    else:
+        # Cori KNL nodes have 1x Xeon Phi 7250 (68 cores)
+        # We will use only 64 cores unless we use the --knl-68 option
+        if ( options.knl_68 ):
+            # Limit threads to the number that fits in a quad / SNC4 section
+            if ( options.hyper == 1 ):
+                if ( not nt in [1,17]):
+                    sys.exit('Invalid number of threads for the Cori KNL partition,\n' +
+                        'must be one of [1,17]')
+            if ( options.hyper == 2 ):
+                if ( not nt in [1,17,34]):
+                    sys.exit('Invalid number of threads for the Cori KNL partition,\n' +
+                        'must be one of [1,17,34]')
+            if ( options.hyper == 4 ):
+                if ( not nt in [1,17,34,68]):
+                    sys.exit('Invalid number of threads for the Cori KNL partition,\n' +
+                        'must be one of [1,17,34,68]')
+            else:
+                sys.exit('Invalid hyperthreading parameter for the Cori KNL partition, must be 1, 2 or 4.')
+
+            ncores_node = 1 * 68 * options.hyper
+
+            core_spec = ""
+
+        else:
+
+            # Limit threads to the number that fits in a quad / SNC4 section
+            if ( options.hyper == 1 ):
+                if ( not nt in [1,2,4,8,16]):
+                    sys.exit('Invalid number of threads for the Cori KNL partition,\n' +
+                        'must be one of [1,2,4,8,16]')
+            if ( options.hyper == 2 ):
+                if ( not nt in [1,2,4,8,16,32]):
+                    sys.exit('Invalid number of threads for the Cori KNL partition,\n' +
+                        'must be one of [1,2,4,8,16,32]')
+            if ( options.hyper == 4 ):
+                if ( not nt in [1,2,4,8,16,32,64]):
+                    sys.exit('Invalid number of threads for the Cori KNL partition,\n' +
+                        'must be one of [1,2,4,8,16,32,64]')
+            else:
+                sys.exit('Invalid hyperthreading parameter for the Cori KNL partition, must be 1, 2 or 4.')
+
+            ncores_node = 1 * 64 * options.hyper
+
+            # Set aside 4 cores to isolate system overhead (system interrupts, etc.)
+            core_spec = "#SBATCH --core-spec=4"
+
+        # Set memory configuration
+        # Not all memory configurations are available. If selecting a configuration that is not
+        # available you will get an error:
+        # sbatch: error: Batch job submission failed: Invalid feature specification
+
+        # We always use Cache mode
+        if ( options.knl_snc4 ):
+            partition = "knl,snc4,cache"
+            membind   = "numactl --membind 4,5,6,7"
+        elif ( options.knl_snc2 ):
+            partition = "knl,snc2,cache"
+            membind   = "numactl --membind 2,3"
+        else:
+            # System default, same as "knl,quad,cache"
+            partition = "knl"
+            membind   = ""
+
+    # Total threads for the simulation
+    total_threads = ntask * nthreads
+
+    # Required nodes
+    cori_nodes = total_threads / ncores_node
+
+    if ( cori_nodes * ncores_node != total_threads ):
+        sys.exit('Invalid number of node_number and/or nthreads for the selected Cori partition,\n' +
+                 'total nodes * threads must be a multiple of %d' % ncores_node )
+
+    # When using more MPI tasks than physical cores per node you must use cpu_bind=threads instead of
+    # cpu_bind=cores
+    if ( options.hyper > nthreads ):
+        cpu_bind = "threads"
+    else:
+        cpu_bind = "cores"
+
+
+    # Number of logical cores per task (same as node_conf n_threads)
+    cores_task = nthreads
+
+    # Get arguments
+    args = inputFile
+
+    # Set restart flag
+    if ( options.restart ) :
+        args = '-r ' + args
+
+    # Generate template
+    return Template( templateJob ).substitute( CORI_NODES = cori_nodes, WALLTIME = options.wallTime,
+                  QUEUE = options.queue, PARTITION = partition, JOBNAME = jobName,
+                  USER = os.environ['USER'],
+                  MEM_BIND = membind, CPU_BIND = cpu_bind, OMP_PROC_BIND = options.omp_proc_bind,
+                  NTHREADS = nthreads, NTASK = ntask, CORES_TASK = cores_task,
+                  CORE_SPEC = core_spec, BINARY = binary, ARGS = args )
+
+#------------------------------------------------------------------------------------------------
+
+import sys, os, re
+from optparse import OptionParser
+from string import Template
+
+#------------------------------------------------------------------------------------------------
+# Prompt user for confirmation
+#------------------------------------------------------------------------------------------------
+
+## {{{ http://code.activestate.com/recipes/541096/ (r1)
+def confirm(prompt=None, resp=False):
+    """prompts for yes or no response from the user. Returns True for yes and
+    False for no.
+
+    'resp' should be set to the default value assumed by the caller when
+    user simply types ENTER.
+
+    >>> confirm(prompt='Create Directory?', resp=True)
+    Create Directory? [y]|n:
+    True
+    >>> confirm(prompt='Create Directory?', resp=False)
+    Create Directory? [n]|y:
+    False
+    >>> confirm(prompt='Create Directory?', resp=False)
+    Create Directory? [n]|y: y
+    True
+
+    """
+
+    if prompt is None:
+        prompt = 'Confirm'
+
+    if resp:
+        prompt = '%s [%s]|%s: ' % (prompt, 'y', 'n')
+    else:
+        prompt = '%s [%s]|%s: ' % (prompt, 'n', 'y')
+
+    while True:
+        ans = raw_input(prompt)
+        if not ans:
+            return resp
+        if ans not in ['y', 'Y', 'n', 'N']:
+            print 'please enter y or n.'
+            continue
+        if ans == 'y' or ans == 'Y':
+            return True
+        if ans == 'n' or ans == 'N':
+            return False
+## end of http://code.activestate.com/recipes/541096/ }}}
+
+#------------------------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------------------------
+# Get the parallel information (number of dimensions, number of nodes, number of threads ) from
+# an OSIRIS input file
+#------------------------------------------------------------------------------------------------
+
+def parallel_info( inputFile ):
+
+    file = open( inputFile, 'r' )
+
+    # Get number of nodes in each direction, and number of threads per node
+    nodes = [0,0,0]
+    nt = 1
+
+    for line in file :
+        if ( re.match( "[^!]*node_number", line.lower()) ):
+           a = re.match( "[^!]*node_number\s*\(\s*(\d+)\s*\:\s*(\d+)\s*\)\s*=\s*([\d\,\s]*)", line.lower())
+           if ( a ) :
+              low = int(a.group(1))
+              up  = int(a.group(2))
+
+              nvalues = up - low + 1
+
+              values = re.findall( "\s*(\d+)\s*",a.group(3))
+
+              if ( len(values) == nvalues ) :
+                  i = low
+                  for val in values :
+                    nodes[i-1] = int(val)
+                    i = i + 1
+              else :
+                  sys.exit('syntax error, aborting...')
+
+           else :
+              a = re.match( "[^!]*node_number\s*\(\s*(\d+)\s*\)\s*=\s*([\d\,\s]*)", line.lower())
+
+              if ( a ) :
+                 i = int( a.group(1) )
+                 nodes[i-1] = int( a.group(2) )
+
+              else :
+                 sys.exit('syntax error, aborting...')
+        else :
+            # Loook for number of threads
+            a = re.match( "[^!]*n_threads\s*=\s*(\d+)\s*", line.lower())
+            if ( a ):
+                nt = int( a.group(1) )
+
+    # close the file
+    file.close()
+
+    # Get number of dimensions and total number of nodes
+    ndims  = 0
+    nnodes = 1
+    for n in nodes :
+        if ( n <= 0 ) :
+            break
+        nnodes = nnodes * n
+        ndims = ndims + 1
+
+    if ( ndims == 0 ) :
+        sys.exit('Invalid number of nodes, aborting...')
+
+    return ndims, nnodes, nt
+
+
+#------------------------------------------------------------------------------------------------
+# Main script
+#------------------------------------------------------------------------------------------------
+
+# Parse command line options
+
+parser = OptionParser(usage = "usage: %prog [options] osiris-input-file" )
+parser.add_option( "-b","--batch", dest="batchMode", action="store_true", default = False, \
+                     help = "No confirmation before submitting job to queue (batch mode)." )
+parser.add_option( "-p","--partition", dest="partition", default = "knl", \
+                     help = "Computing partition to use, must be knl (default) or cpu." )
+parser.add_option( "-q","--queue", dest="queue", default = "regular", \
+                     help = "Computing queue, must be one of debug, regular (default) or premium." )
+parser.add_option( "-t","--walltime", dest="wallTime", \
+                     help = "Wall clock time requested in the form 'hh:mm:ss'." )
+parser.add_option( "-r","--restart", dest="restart", action="store_true", default = False, \
+                     help = "Restart simulation from checkpoint information" )
+parser.add_option( "-n","--nhyperthread", dest="hyper", default = 0, \
+                     help = "Number of threads per core, must be 1, 2 (default for cpu partition) or 4 (default for knl partition). " +
+                     "4 is only allowed in the knl partition." )
+parser.add_option( "--thread-bind", dest="omp_proc_bind", default = "close", \
+                     help = "OpenMP thread binding layout, must be close (default), spread or true." )
+parser.add_option( "--knl-68", dest="knl_68", action="store_true", default = False, \
+                     help = "Use all 68 cores on KNL processor for the job. The default is to use only 64 cores for " +
+                     "the job, and set aside 4 cores for system use." )
+parser.add_option( "--knl-snc2", dest="knl_snc2", action="store_true", default = False, \
+                     help = "Use the SNC2 memory mode (available through reservation only). The default is to use the QUAD mode." )
+parser.add_option( "--knl-snc4", dest="knl_snc4", action="store_true", default = False, \
+                     help = "Use the SNC4 memory mode (available through reservation only). The default is to use the QUAD mode." )
+
+parser.add_option( "-w","--watch-queue", dest="watch_queue", action="store_true", default = False, \
+                     help = "Watch queue after successful job launch." )
+parser.add_option( "-v","--verbose", dest="verbose", action="store_true", default = False, \
+                     help = "Show jobscript details." )
+
+
+(options, args) = parser.parse_args()
+
+if ( len(args) == 0 ):
+    parser.error('No OSIRIS input file supplied')
+
+inputFile = args[0]
+
+if ( not os.path.isfile(inputFile) ):
+    parser.error('File not found : '+inputFile)
+
+# Wall clock time must be supplied
+if ( options.wallTime == None ) :
+    parser.error('Wall clock time limit must be supplied!')
+
+# Check partition choice
+if ( not options.partition in ('cpu','knl')):
+    sys.exit('Invalid partition chosen, must be one of "cpu" or "knl"')
+
+# Check queue choice
+if ( not options.queue in ('debug','regular','premium')):
+    sys.exit('Invalid queue chosen, must be one of debug, regular, or premium')
+
+
+# Check thread binding choice
+if ( not options.omp_proc_bind in ('close','spread','true')):
+    sys.exit('Invalid OpenMP thread binding, must be one of close, spread or true')
+
+# Check hyperthreading (threads per core) settings
+options.hyper = int( options.hyper )
+if ( options.partition == 'cpu'):
+    # Default hyperthreading for Haswell partition
+    if ( options.hyper == 0 ):
+        options.hyper = 2
+    if ( not options.hyper in (1,2) ) :
+        sys.exit('Invalid number of threads per core for the Cori Haswell (cpu) partition ('+str(options.hyper)+'), must be 1 or 2.')
+
+    ncores_node = 2 * 16 * options.hyper
+
+else:
+    # Default hyperthreading for KNL partition
+    if ( options.hyper == 0 ):
+        options.hyper = 4
+    if ( not options.hyper in (1,2,4) ) :
+        sys.exit('Invalid number of threads per core for the Cori KNL partition ('+str(options.hyper)+'), must be 1, 2 or 4.')
+
+    # Logical cores per node
+    if ( options.knl_68 ):
+        ncores_node = 1 * 68 * options.hyper
+    else:
+        ncores_node = 1 * 64 * options.hyper
+
+
+# Get parallel Info
+ndims, nnodes, nt = parallel_info( inputFile )
+
+# Check for Osiris binary
+binary = './osiris-' + str(ndims) + 'D.' + options.partition
+
+if ( not os.access(binary, os.X_OK ) ):
+    sys.exit('Osiris binary '+binary+' not found or not executable')
+
+# Job Name
+jobName = os.path.basename(inputFile)
+
+# Create job file
+job = job_file( binary, nnodes, nt, options, jobName, inputFile )
+
+
+if ( options.batchMode ) :
+    launch = True
+else :
+    # Print information
+    print "\nOSIRIS Job\n"
+    print "Partition                : ", options.partition
+    print "Input file               : ", inputFile
+    print "Dimensions               : ", ndims
+    print "Processes / threads      : ", nnodes, '/', nt
+    print "Wall clock limit         : ", options.wallTime
+    print "Requested cores / nodes  : ", nnodes * nt / options.hyper, "core(s) on", nnodes * nt / ncores_node, "node(s)"
+    print "Hyperthreading           : ", options.hyper, "thread(s) per core"
+    print "OpenMP thread binding    : ", options.omp_proc_bind
+
+    if ( options.verbose ):
+        print "\nJob File:"
+        print "---"
+        print job
+        print "---"
+
+    print ""
+    launch = confirm( "Submit job?", resp = False )
+
+# Launch the job
+
+if ( launch ) :
+    # Write the job file to disk
+    jobFile = open ( jobName + '.sl', 'w' )
+    print >> jobFile, job
+    jobFile.close()
+
+    if ( options.verbose ):
+        print '\n%s %s' % (submitCmd, jobName + '.sl')
+
+    if ( os.system( '%s %s' % (submitCmd, jobName + '.sl') ) != 0 ) :
+        print >> sys.stderr, 'Unable to launch job'
+    else :
+        if ( options.watch_queue ):
+            os.system( '%s %s' % ( watchQueueCmd, os.environ['USER']) )
+        else:
+            os.system( '%s %s' % ( qstatCmd, os.environ['USER']) )
+
+# End
+

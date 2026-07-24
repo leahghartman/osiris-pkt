@@ -1,0 +1,298 @@
+#!/usr/bin/env python
+
+#------------------------------------------------------------------------------------------------
+#
+# OSIRIS queue submission script
+#
+# This script automates the process of launching an OSIRIS job on queue based systems. 
+#
+#
+#------------------------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------------------------
+# Job submission script for the FERMI System
+#  - This system uses LoadLeveler
+#------------------------------------------------------------------------------------------------
+
+# Command used to submit jobs
+submitCmd = "llsubmit"
+
+# Command used to check the queue
+qstatCmd  = "llq -u"
+
+#------------------------------------------------------------------------------------------------
+# Creates the job file 
+#------------------------------------------------------------------------------------------------
+
+templateJob = \
+"""
+#!/bin/bash
+# @ job_name = ${JOBNAME}
+# @ comment = "OSIRIS Bluegene Job"
+# @ error = osiris.stderr
+# @ output = osiris.stdout
+# @ environment = COPY_ALL;
+# @ wall_clock_limit = ${WALLTIME}
+# @ notification = error
+# @ notify_user = $$USER@fermi.cineca.it
+# @ job_type = bluegene
+# @ bg_connectivity = ${CONNECTIVITY}
+# @ bg_size = ${BGSIZE}
+# @ account_no = Pra11_2949
+# @ queue
+
+date
+
+runjob --exe ${BINARY} --args "${ARGS}" \
+--envs OMP_NUM_THREADS=${NTHREADS} \
+--ranks-per-node ${RANKSPERNODE} --np ${NNODES} 
+
+date
+
+"""
+
+def job_file( binary, nnodes, nt, options, jobName, inputFile ):
+    
+    # Check number of threads
+    if ( not nt in [1,2,4,8,16,32,64] ) :
+        sys.exit('Invalid number of threads for Fermi system ('+str(nt)+'), must be a power of 2 and <= 64.')
+    
+    # Get ranks per node
+    ranksPerNode = 16 * options.hyper / nt
+
+    if ( not ranksPerNode in [1,2,4,8,16,32,64] ) :
+        sys.exit('Invalid combination of number of threads and number of threads per core for Fermi system.')
+        
+    # Get size of Bluegene partition
+    bgSize = nnodes / ranksPerNode
+    
+    if ( bgSize * ranksPerNode != nnodes ) :
+        sys.exit('Invalid number of nodes')
+            
+    # Get arguments
+    args = inputFile
+    
+    # Set restart flag
+    if ( options.restart ) :
+        args = '-r ' + args
+    
+    # Generate template
+    return Template( templateJob ).substitute( JOBNAME = jobName, WALLTIME = options.wallTime, 
+                  BGSIZE = bgSize, RANKSPERNODE = ranksPerNode, NNODES = nnodes, NTHREADS = nt,  
+                  BINARY = binary, ARGS = args, CONNECTIVITY = options.connectivity )
+
+#------------------------------------------------------------------------------------------------
+
+import sys, os, re
+from optparse import OptionParser
+from string import Template
+
+#------------------------------------------------------------------------------------------------
+# Prompt user for confirmation
+#------------------------------------------------------------------------------------------------
+
+## {{{ http://code.activestate.com/recipes/541096/ (r1)
+def confirm(prompt=None, resp=False):
+    """prompts for yes or no response from the user. Returns True for yes and
+    False for no.
+
+    'resp' should be set to the default value assumed by the caller when
+    user simply types ENTER.
+
+    >>> confirm(prompt='Create Directory?', resp=True)
+    Create Directory? [y]|n: 
+    True
+    >>> confirm(prompt='Create Directory?', resp=False)
+    Create Directory? [n]|y: 
+    False
+    >>> confirm(prompt='Create Directory?', resp=False)
+    Create Directory? [n]|y: y
+    True
+
+    """
+    
+    if prompt is None:
+        prompt = 'Confirm'
+
+    if resp:
+        prompt = '%s [%s]|%s: ' % (prompt, 'y', 'n')
+    else:
+        prompt = '%s [%s]|%s: ' % (prompt, 'n', 'y')
+        
+    while True:
+        ans = raw_input(prompt)
+        if not ans:
+            return resp
+        if ans not in ['y', 'Y', 'n', 'N']:
+            print 'please enter y or n.'
+            continue
+        if ans == 'y' or ans == 'Y':
+            return True
+        if ans == 'n' or ans == 'N':
+            return False
+## end of http://code.activestate.com/recipes/541096/ }}}
+
+#------------------------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------------------------
+# Get the parallel information (number of dimensions, number of nodes, number of threads ) from
+# an OSIRIS input file
+#------------------------------------------------------------------------------------------------
+
+def parallel_info( inputFile ):
+    
+    
+    file = open( inputFile, 'r' )
+    
+    # Get number of nodes in each direction, and number of threads per node 
+    nodes = [0,0,0]
+    nt = 1
+    
+    for line in file :
+        if ( re.match( "[^!]*node_number", line.lower()) ):
+           a = re.match( "[^!]*node_number\s*\(\s*(\d+)\s*\:\s*(\d+)\s*\)\s*=\s*([\d\,\s]*)", line.lower())
+           if ( a ) :
+              low = int(a.group(1))
+              up  = int(a.group(2))
+              
+              nvalues = up - low + 1
+              
+              values = re.findall( "\s*(\d+)\s*",a.group(3))
+              
+              if ( len(values) == nvalues ) : 
+                  i = low
+                  for val in values :
+                    nodes[i-1] = int(val)
+                    i = i + 1
+              else :
+                  sys.exit('syntax error, aborting...')
+           
+           else :
+              a = re.match( "[^!]*node_number\s*\(\s*(\d+)\s*\)\s*=\s*([\d\,\s]*)", line.lower())
+
+              if ( a ) :
+                 i = int( a.group(1) )
+                 nodes[i-1] = int( a.group(2) )
+              
+              else :
+                 sys.exit('syntax error, aborting...')
+        else :
+            # Loook for number of threads
+            a = re.match( "[^!]*n_threads\s*=\s*(\d+)\s*", line.lower())
+            if ( a ):
+                nt = int( a.group(1) )
+              
+    # close the file
+    file.close()
+    
+    # Get number of dimensions and total number of nodes
+    ndims  = 0
+    nnodes = 1
+    for n in nodes :
+        if ( n <= 0 ) :
+            break
+        nnodes = nnodes * n
+        ndims = ndims + 1
+    
+    if ( ndims == 0 ) :
+        sys.exit('Invalid number of nodes, aborting...')
+    
+    return ndims, nnodes, nt
+ 
+
+#------------------------------------------------------------------------------------------------
+# Main script
+#------------------------------------------------------------------------------------------------
+
+# Parse command line options
+
+parser = OptionParser(usage = "usage: %prog [options] osiris-input-file" )
+parser.add_option( "-b","--batch", dest="batchMode", action="store_true", default = False, \
+                     help = "No confirmation before submitting job to queue (batch mode)" )
+parser.add_option( "-t","--walltime", dest="wallTime", \
+                     help = "Wall clock time requested in the form 'hh:mm:ss'" )
+parser.add_option( "-r","--restart", dest="restart", action="store_true", default = False, \
+                     help = "Restart simulation from checkpoint information" )
+parser.add_option( "-n","--nhyperthread", dest="hyper", default = 1, \
+                     help = "Number of threads per core, must be 1 (default), 2 or 4" )
+parser.add_option( "-c","--connectivity", dest="connectivity", default = "MESH", \
+                     help = "BlueGene connectivity flag, must be one of MESH (default), TORUS or EITHER" )
+
+
+(options, args) = parser.parse_args()
+
+if ( len(args) == 0 ):
+    parser.error('No OSIRIS input file supplied')
+    
+inputFile = args[0]
+
+if ( not os.path.isfile(inputFile) ):
+    parser.error('File not found : '+inputFile)
+
+# Wall clock time must be supplied
+if ( options.wallTime == None ) :
+    parser.error('Wall clock time limit must be supplied!')
+
+# Check hyperthreading (threads per core) settings
+options.hyper = int( options.hyper )
+if ( not options.hyper in [1,2,4] ) :
+	sys.exit('Invalid number of threads per core for Fermi system ('+str(options.hyper)+'), must be 1, 2 or 4.')
+
+# Check connectivity settings
+if ( not options.connectivity in ["MESH","TORUS","EITHER"] ) :
+	sys.exit('Invalid BlueGene connectivity flag, must be one of MESH, TORUS or EITHER')
+
+
+# Get parallel Info
+ndims, nnodes, nt = parallel_info( inputFile )
+
+# Check for Osiris binary
+binary = './osiris-' + str(ndims) + 'D.e'
+
+if ( not os.access(binary, os.X_OK ) ):
+    sys.exit('Osiris binary '+binary+' not found or not executable')
+
+
+# Job Name
+jobName = os.path.basename(inputFile)
+
+# Create job file
+job = job_file( binary, nnodes, nt, options, jobName, inputFile )
+
+
+if ( options.batchMode ) :
+    launch = True
+else : 
+    # Print information
+    print "Input file          : ", inputFile
+    print "Dimensions          : ", ndims
+    print "Processes / threads : ", nnodes, '/', nt
+    print "Hyperthreading      : ", options.hyper, "thread(s) per core"
+    print "Requested cores     : ", nnodes * nt / options.hyper
+    print "Compute nodes       : ", ( nnodes * nt / options.hyper ) / 1
+    print "Wall clock limit    : ", options.wallTime
+    
+    print "Job File:"
+    print "---"
+    print job
+    print "---"
+    launch = confirm( "Submit job?", resp = False )
+
+# Launch the job
+
+if ( launch ) :
+    # Write the job file to disk
+    jobFile = open ( jobName + '.job', 'w' )
+    print >> jobFile, job
+    jobFile.close()
+    
+    print '\n%s %s' % (submitCmd, jobName + '.job')
+    
+    if ( os.system( '%s %s' % (submitCmd, jobName + '.job') ) != 0 ) :
+        print >> sys.stderr, 'Unable to launch job'
+    else :
+        os.system( '%s %s' % ( qstatCmd, os.getlogin()) )
+
+# End
+

@@ -1,0 +1,267 @@
+#!/usr/bin/env python
+
+#------------------------------------------------------------------------------------------------
+#
+# OSIRIS queue submission script
+#
+# This script automates the process of launching an OSIRIS job on queue based systems. 
+#
+#
+#------------------------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------------------------
+# Job submission script for Jugene System
+#  - This system uses LoadLeveler
+#------------------------------------------------------------------------------------------------
+
+# Command used to submit jobs
+submitCmd = "llsubmit"
+
+# Command used to check the queue
+qstatCmd  = "llq -u"
+
+#------------------------------------------------------------------------------------------------
+# Creates the job file 
+#------------------------------------------------------------------------------------------------
+
+templateJob = \
+"""
+# @ job_name = ${JOBNAME}
+# @ comment = "OSIRIS Bluegene Job"
+# @ error = osiris.stderr
+# @ output = osiris.stdout
+# @ environment = COPY_ALL;
+# @ wall_clock_limit = ${WALLTIME}
+# @ notification = error
+# @ notify_user = $$USER@fz-juelich.de
+# @ job_type = bluegene
+# @ bg_connection = TORUS
+# @ bg_size = ${BGSIZE}
+# @ queue
+
+date
+
+time mpirun -exe ${BINARY} -mode ${BGMODE} -np ${NNODES} -args "${INPUTFILE}" \
+-verbose 2 -env OMP_NUM_THREADS=${NTHREADS} 
+
+date
+
+"""
+
+def job_file( ndims, nnodes, nt, wallTime, jobName, inputFile ):
+    
+    # Check number of threads
+    if ( not nt in [1,2,4] ) :
+        sys.exit('Invalid number of threads for Jugene system ('+str(nt)+'), must be 1, 2 or 4.')
+    
+    # Get SMP mode
+    bgMode = { 1 : 'VN', 2 : 'DUAL', 4 : 'SMP' } [ nt ]
+    
+    # Get size of Bluegene partition
+    bgSize = nnodes * nt / 4
+    if ( bgSize == 0 ) :
+        bgSize = 1
+    
+    # Get binary file name
+    binary = './osiris-' + str(ndims) + 'D.e'
+    
+    return Template( templateJob ).substitute( JOBNAME = jobName, WALLTIME = wallTime, 
+                  BGSIZE = bgSize, BGMODE = bgMode, NNODES = nnodes, NTHREADS = nt,  
+                  BINARY = binary, INPUTFILE = inputFile)
+
+#------------------------------------------------------------------------------------------------
+
+import sys, os, re
+from optparse import OptionParser
+from string import Template
+
+#------------------------------------------------------------------------------------------------
+# Prompt user for confirmation
+#------------------------------------------------------------------------------------------------
+
+## {{{ http://code.activestate.com/recipes/541096/ (r1)
+def confirm(prompt=None, resp=False):
+    """prompts for yes or no response from the user. Returns True for yes and
+    False for no.
+
+    'resp' should be set to the default value assumed by the caller when
+    user simply types ENTER.
+
+    >>> confirm(prompt='Create Directory?', resp=True)
+    Create Directory? [y]|n: 
+    True
+    >>> confirm(prompt='Create Directory?', resp=False)
+    Create Directory? [n]|y: 
+    False
+    >>> confirm(prompt='Create Directory?', resp=False)
+    Create Directory? [n]|y: y
+    True
+
+    """
+    
+    if prompt is None:
+        prompt = 'Confirm'
+
+    if resp:
+        prompt = '%s [%s]|%s: ' % (prompt, 'y', 'n')
+    else:
+        prompt = '%s [%s]|%s: ' % (prompt, 'n', 'y')
+        
+    while True:
+        ans = raw_input(prompt)
+        if not ans:
+            return resp
+        if ans not in ['y', 'Y', 'n', 'N']:
+            print 'please enter y or n.'
+            continue
+        if ans == 'y' or ans == 'Y':
+            return True
+        if ans == 'n' or ans == 'N':
+            return False
+## end of http://code.activestate.com/recipes/541096/ }}}
+
+#------------------------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------------------------
+# Get the parallel information (number of dimensions, number of nodes, number of threads ) from
+# an OSIRIS input file
+#------------------------------------------------------------------------------------------------
+
+def parallel_info( inputFile ):
+    
+    
+    file = open( inputFile, 'r' )
+    
+    # Get number of nodes in each direction, and number of threads per node 
+    nodes = [0,0,0]
+    nt = 1
+    
+    for line in file :
+        if ( re.match( "[^!]*node_number", line.lower()) ):
+           a = re.match( "[^!]*node_number\s*\(\s*(\d+)\s*\:\s*(\d+)\s*\)\s*=\s*([\d\,\s]*)", line.lower())
+           if ( a ) :
+              low = int(a.group(1))
+              up  = int(a.group(2))
+              
+              nvalues = up - low + 1
+              
+              values = re.findall( "\s*(\d+)\s*",a.group(3))
+              
+              if ( len(values) == nvalues ) : 
+                  i = low
+                  for val in values :
+                    nodes[i-1] = int(val)
+                    i = i + 1
+              else :
+                  sys.exit('syntax error, aborting...')
+           
+           else :
+              a = re.match( "[^!]*node_number\s*\(\s*(\d+)\s*\)\s*=\s*([\d\,\s]*)", line.lower())
+
+              if ( a ) :
+                 i = int( a.group(1) )
+                 nodes[i-1] = int( a.group(2) )
+              
+              else :
+                 sys.exit('syntax error, aborting...')
+        else :
+            # Loook for number of threads
+            a = re.match( "[^!]*n_threads\s*=\s*(\d+)\s*", line.lower())
+            if ( a ):
+                nt = int( a.group(1) )
+              
+    # close the file
+    file.close()
+    
+    # Get number of dimensions and total number of nodes
+    ndims  = 0
+    nnodes = 1
+    for n in nodes :
+        if ( n <= 0 ) :
+            break
+        nnodes = nnodes * n
+        ndims = ndims + 1
+    
+    if ( ndims == 0 ) :
+        sys.exit('Invalid number of nodes, aborting...')
+    
+    return ndims, nnodes, nt
+ 
+
+#------------------------------------------------------------------------------------------------
+# Main script
+#------------------------------------------------------------------------------------------------
+
+# Parse command line options
+
+parser = OptionParser(usage = "usage: %prog [options] osiris-input-file" )
+parser.add_option( "-b","--batch", dest="batchMode", action="store_true", default = False, \
+                     help = "No confirmation before submitting job to queue (batch mode)" )
+parser.add_option( "-t","--walltime", dest="wallTime", \
+                     help = "Wall clock time requested in the form 'hh:mm:ss'" )
+
+
+(options, args) = parser.parse_args()
+
+if ( len(args) == 0 ):
+    parser.error('No OSIRIS input file supplied')
+    
+inputFile = args[0]
+
+if ( not os.path.isfile(inputFile) ):
+    parser.error('File not found : '+inputFile)
+
+# Wall clock time must be supplied
+if ( options.wallTime == None ) :
+    parser.error('Wall clock time limit must be supplied!')
+
+# Check for Osiris binary
+if ( not os.access('./osiris-3D.e', os.X_OK ) ):
+    sys.exit('Osiris binary ./osiris-3D.e not found or not executable')
+
+# Get parallel Info
+ndims, nnodes, nt = parallel_info( inputFile )
+
+if ( ndims != 3 ) :
+    sys.exit('Only 3D input files are currently supported, aborting...')
+
+# Job Name
+jobName = os.path.basename(inputFile)
+
+# Create job file
+job = job_file( ndims, nnodes, nt, options.wallTime, jobName, inputFile )
+
+
+if ( options.batchMode ) :
+    launch = True
+else : 
+    # Print information
+    print "Input file       : ", inputFile
+    print "Dimensions       : ", ndims
+    print "Requested cores  : ", nnodes * nt, "(",nt, " * ", nnodes, ")"
+    print "Wall clock limit : ", options.wallTime
+    
+    print "Job File:"
+    print "---"
+    print job
+    print "---"
+    launch = confirm( "Submit job?", resp = False )
+
+# Launch the job
+
+if ( launch ) :
+    # Write the job file to disk
+    jobFile = open ( jobName + '.job', 'w' )
+    print >> jobFile, job
+    jobFile.close()
+    
+    print '\n%s %s' % (submitCmd, jobName + '.job')
+    
+    if ( os.system( '%s %s' % (submitCmd, jobName + '.job') ) != 0 ) :
+        print >> sys.stderr, 'Unable to launch job'
+    else :
+        os.system( '%s %s' % ( qstatCmd, os.getlogin()) )
+
+# End
+

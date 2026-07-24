@@ -1,0 +1,136 @@
+##########################################################################
+# System specific configuration for OSIRIS
+#   System:    GreatLakes at UMich
+#   Compilers: Intel family ( icc, ifort )
+##########################################################################
+
+##########################################################################
+# OSIRIS configuration
+
+# as of 3/23/23 there is a bug in the gr module that causes the intel
+# compilers to crash so we disable this by default here
+DISABLE_GR = 1
+
+# modules than can be turned on and off commenting and uncommenting each line
+# DISABLE_XXFEL = 1
+# DISABLE_TILES = 1
+# DISABLE_SHEAR = 1
+# DISABLE_RAD = 1
+# DISABLE_RADCYL = 1
+# DISABLE_CYLMODES = 1
+# DISABLE_QED = 1
+# DISABLE_QEDCYL = 1
+# DISABLE_PGC = 1
+# DISABLE_OVERDENSE = 1
+# DISABLE_OVERDENSE_CYL = 1
+# DISABLE_NEUTRAL_SPIN = 1
+
+# Set the following to a system optimized timer, or leave commented to use a default one
+TIMER = __POSIX_TIMER__
+
+# SIMD
+# Uncomment the following line to use SIMD optimized code.
+# You can use SIMD = SSE, AVX or AVX2
+#SIMD = SSE
+#SIMD = AVX
+SIMD = AVX2
+
+# Numeric precision (SINGLE|DOUBLE)
+# also update fftw flags at bottom of file
+PRECISION = SINGLE
+#PRECISION = DOUBLE
+
+##########################################################################
+# Compilers
+
+F90 = mpifort
+F03 = mpifort -stand f03 -free
+
+cc  = mpicc -restrict -ansi-alias
+CC  = mpicc -restrict -ansi-alias
+
+F90FLAGS_all = -fpp -diag-disable 5117 -align array32byte
+
+# Fortran preprocessor
+FPP = gcc -C -E -x assembler-with-cpp
+
+# This flag supresses some hyper-vigilant compilier warnings that have been deemed harmless. The list of warnings
+# can be found is ./source/config.mk.warnings. If you are having some strange issues that you need to debug
+# comment out DISABLE_PARANOIA and/or read the ./source/config.warnings file to allow the warnings if you think
+# they may help you find the issue.
+DISABLE_PARANOIA = YES
+
+##########################################################################
+# Fortran flags
+
+# External name mangling
+UNDERSCORE = FORTRANSINGLEUNDERSCORE
+
+# Flag to enable compilation of .f03 files (so far only intel compiler requires this)
+F03_EXTENSION_FLAG = -free -Tf
+
+# Enable OpenMP code
+FPP += -D_OPENMP
+F90FLAGS_all += -qopenmp
+
+# ------------------------- Compilation Targets -------------------------
+
+# Debug
+F90FLAGS_debug      = $(F90FLAGS_all) -O0 -g -debug all -traceback -check all,noarg_temp_created \
+                      -warn all -fpe-all=0 -ftrapuv
+
+# Production
+F90FLAGS_production = $(F90FLAGS_all) -O3 -ipo -no-prec-div -xHost
+
+# Profile Shark
+# you cannot source profile with -ipo -static (which are turned on by -fast)
+# After compilation you must generate the symbol table manually (the system gets confused
+# because of the extra preprocessor, the C code does not require this)
+# go to the directory where the binary is located and run:
+# % dsymutil <binary-name>
+
+F90FLAGS_profile    = $(F90FLAGS_all) -O3 -xHost -debug all -qopt-report=5
+
+##########################################################################################
+# C flags
+
+# -wd,981,1418,2259 \
+#debug
+CFLAGS_debug = -O0 -g -debug full -traceback -fp-trap-all=common -Wall -w3 -wd,981,1418,2259\
+               -pedantic -std=c99
+
+# profile
+CFLAGS_profile = -O3 -xHost -std=c99 -debug all
+
+# production
+CFLAGS_production = -ipo -O3 -xHost -no-prec-div -ansi-alias -std=c99
+
+##########################################################################################
+# Linker flags
+
+#LDFLAGS = -WL,-rpath,${MPI_HOME}/lib
+
+##########################################################################################
+# Libraries
+
+# MPI
+FPP += -D__HAS_MPI_IN_PLACE__
+#MPI_FCOMPILEFLAGS = $(shell mpifort -show | cut -f 1 --complement -d ' ')
+#MPI_FLINKFLAGS    = $(shell mpifort -show | cut -f 1 --complement -d ' ')
+
+# Uncomment the following if HDF5 supports parallel MPIIO
+#H5_HAVE_PARALLEL = 1
+# HDF5
+H5_ROOT          = ${HDF5_ROOT}
+H5_FCOMPILEFLAGS = -I${HDF5_INCLUDE}
+H5_FLINKFLAGS    = -L${HDF5_LIB} \
+                   -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 \
+                   -lz -lrt -ldl -lm -Wl,-rpath -Wl,${HDF5_LIB}
+
+FFTW_FCOMPILEFLAGS = -I${FFTW_INCLUDE}
+# flags for single precision
+FFTW_FLINKFLAGS    = -L${FFTW_LIB} \
+                     -lfftw3f -lm
+# flags for double precision
+#FFTW_FLINKFLAGS   = -L${FFTW_LIB} \
+#                    -lfftw3 -lm

@@ -1,0 +1,287 @@
+
+namelist_details = {
+####################################################################
+#           Defintions for nl_sp_filter
+####################################################################
+ '/m_current_cyl_modes/read_input_current_cyl_modes/nl_sp_filter': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('filter_limit',
+""" 
+"""),
+    ('filter_width',
+""" 
+"""),
+    ('correct_current',
+""" 
+"""),
+    ('filter_current',
+""" 
+"""),
+    ('n_damp_cell',
+""" 
+"""),
+ ]
+ },
+####################################################################
+#           Defintions for nl_el_mag_fld
+####################################################################
+ '/m_emf_cyl_modes/read_input_emf_cyl_modes/nl_el_mag_fld': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('solver',
+""" 
+"""),
+    ('n_coef',
+""" 
+"""),
+    ('coef',
+""" 
+"""),
+    ('solver_ord',
+""" 
+"""),
+    ('kl',
+""" 
+"""),
+    ('ku',
+""" 
+"""),
+    ('dk',
+""" 
+"""),
+    ('smooth_type',
+""" 
+"""),
+    ('smooth_niter',
+""" 
+"""),
+    ('smooth_nmax',
+""" 
+"""),
+    ('init_dipole_b_m',
+""" 
+"""),
+    ('init_dipole_b_x0',
+""" 
+"""),
+    ('init_dipole_b_r0',
+""" 
+"""),
+    ('init_dipole_e_p',
+""" 
+"""),
+    ('init_dipole_e_x0',
+""" 
+"""),
+    ('init_dipole_e_r0',
+""" 
+"""),
+    ('ext_fld',
+""" 
+"""),
+    ('type_ext_b',
+""" 
+"""),
+    ('type_ext_e',
+""" 
+"""),
+    ('ext_b0',
+""" 
+"""),
+    ('ext_e0',
+""" 
+"""),
+    ('ext_b_mfunc',
+""" 
+"""),
+    ('ext_e_mfunc',
+""" 
+"""),
+    ('ext_dipole_b_m',
+""" 
+"""),
+    ('ext_dipole_b_x0',
+""" 
+"""),
+    ('ext_dipole_b_r0',
+""" 
+"""),
+    ('ext_dipole_e_p',
+""" 
+"""),
+    ('ext_dipole_e_x0',
+""" 
+"""),
+    ('ext_dipole_e_r0',
+""" 
+"""),
+    ('n_subcycle',
+""" 
+"""),
+    ('marder_d',
+""" 
+"""),
+    ('marder_n',
+""" 
+"""),
+ ]
+ },
+####################################################################
+#           Defintions for nl_grid
+####################################################################
+ '/m_grid_cyl_modes/read_input_grid_cyl_modes/nl_grid': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('nx_p',
+""" 
+"""),
+    ('coordinates',
+""" 
+"""),
+    ('n_cyl_modes',
+""" 
+"""),
+    ('load_balance',
+""" 
+"""),
+    ('lb_type',
+""" 
+"""),
+    ('lb_gather',
+""" 
+"""),
+    ('n_dynamic',
+""" 
+"""),
+    ('start_load_balance',
+""" 
+"""),
+    ('max_imbalance',
+""" 
+"""),
+    ('cell_weight',
+""" 
+"""),
+    ('ndump_global_load',
+""" 
+"""),
+    ('ndump_node_load',
+""" 
+"""),
+    ('ndump_grid_load',
+""" 
+"""),
+    ('spatial_loaddensity',
+""" 
+"""),
+ ]
+ },
+####################################################################
+#           Defintions for nl_species
+####################################################################
+ '/m_species_cyl_modes/read_input_species_cyl_modes/nl_species': {
+ 'Label': 
+""" 
+""",
+ 'detail-page-template':  'standard', 
+ 'summary-text':
+""" 
+""",
+ 'detail-page-header':
+""" 
+""",
+ 'detail-page-footer':
+""" 
+""",
+ 'items': [
+    ('name',
+""" 
+"""),
+    ('num_par_max',
+""" 
+"""),
+    ('n_sort',
+""" 
+"""),
+    ('rqm',
+""" 
+"""),
+    ('q_real',
+""" 
+"""),
+    ('num_par_x',
+""" 
+"""),
+    ('num_par_theta',
+""" 
+"""),
+    ('theta_offset',
+""" 
+"""),
+    ('subcycle',
+""" 
+"""),
+    ('push_type',
+""" 
+"""),
+    ('push_start_time',
+""" 
+"""),
+    ('num_pistons',
+""" 
+"""),
+    ('add_tag',
+""" 
+"""),
+    ('free_stream',
+""" 
+"""),
+    ('init_fields',
+""" 
+"""),
+    ('if_collide',
+""" 
+"""),
+    ('if_like_collide',
+""" 
+"""),
+ ]
+ },
+}
